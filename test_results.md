@@ -22,11 +22,11 @@ AC-001 requires a successful flow; Recording initialization threw notImplemented
 ```
 
 ```text
-Test Case '-[CSCI8700_ProjectTests.VoiceTypingAcceptanceTests test_AC001]' failed (2.303 seconds).
-Executed 1 test, with 1 failure (0 unexpected) in 2.303 (2.304) seconds
+Test Case '-[CSCI8700_ProjectTests.VoiceTypingAcceptanceTests test_AC001]' failed (0.087 seconds).
+Executed 1 test, with 1 failure (0 unexpected) in 0.087 (0.088) seconds
 ** TEST FAILED **
 ```
 
 `test_AC001`: behavior assertion failed because the valid Recording initializer is not implemented. Compilation and test loading succeeded. Later assertions were not reached.
 
-The test uses only the documented application contracts and their injected closures. It checks shortcut registration, start/delivery results, audio/text/context forwarding, processing order, and clipboard/paste calls. Local inference results are fixed test inputs; this does not verify model quality, actual field insertion, or absence of external communication. AC-001 has no rejection or error-code contract.
+The test uses only the documented application contracts and their injected closures. It checks Control double-tap registration, start/delivery results, audio/text/context forwarding, processing order, clipboard/paste calls, and no failure notification on success. Local inference results are fixed test inputs; this does not verify model quality, actual field insertion, or absence of external communication. AC-001 has no rejection or error-code contract.

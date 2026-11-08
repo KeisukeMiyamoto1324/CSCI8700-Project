@@ -10,7 +10,7 @@ enum SkeletonError: Error {
 enum ShortcutResult: Equatable {
     case recordingStarted
     case pasted
-    case pending
+    case discarded
 }
 
 // ---------------------------------------------------------
@@ -25,7 +25,8 @@ final class VoiceTypingFlow {
         clipboardPaste: any ClipboardPasteContract,
         language: Language,
         shortcut: String,
-        registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void
+        registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void,
+        notifyInferenceFailure: @escaping () -> Void
     ) throws {
         throw SkeletonError.notImplemented
     }

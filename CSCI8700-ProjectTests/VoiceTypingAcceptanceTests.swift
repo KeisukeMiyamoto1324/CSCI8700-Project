@@ -16,13 +16,14 @@ final class VoiceTypingAcceptanceTests: XCTestCase {
         let transcript = "Please send teh report tomorrow."
         let correctedText = "Please send the report tomorrow."
         let application = "com.apple.TextEdit"
-        let shortcut = "command+shift+space"
+        let shortcut = "control-double-tap"
         var events: [String] = []
         var clipboard: String?
         var pastedText: String?
         var registeredShortcuts: [String] = []
         var registeredHandler: (() throws -> Void)?
         var applicationLookups = 0
+        var failureNotifications = 0
         var stage = "Recording initialization"
 
         do {
@@ -79,7 +80,8 @@ final class VoiceTypingAcceptanceTests: XCTestCase {
                 registerShortcut: { value, handler in
                     registeredShortcuts.append(value)
                     registeredHandler = handler
-                }
+                },
+                notifyInferenceFailure: { failureNotifications += 1 }
             )
 
             // ---------------------------------------------------------
@@ -92,6 +94,7 @@ final class VoiceTypingAcceptanceTests: XCTestCase {
             XCTAssertEqual(events, ["start"])
             XCTAssertNil(clipboard)
             XCTAssertNil(pastedText)
+            XCTAssertEqual(failureNotifications, 0)
 
             // ---------------------------------------------------------
             // The second shortcut processes audio and delivers correction.
@@ -103,6 +106,7 @@ final class VoiceTypingAcceptanceTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(applicationLookups, 1)
             XCTAssertEqual(clipboard, correctedText)
             XCTAssertEqual(pastedText, correctedText)
+            XCTAssertEqual(failureNotifications, 0)
         } catch {
             XCTFail("AC-001 requires a successful flow; \(stage) threw \(error)")
         }

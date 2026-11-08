@@ -1,6 +1,6 @@
 # Contracts
 
-These contracts describe the Swift modules in `CSCI8700-Project/Modules/`. The revised result cases and notification dependency below still need to be reflected in the skeleton and tests.
+These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
 All module classes and protocols use `@MainActor`.
 Every initializer and method currently throws `SkeletonError.notImplemented`.
 The tables describe the intended behavior; business logic is not implemented.
@@ -24,6 +24,7 @@ Error types are not specified. Inference failures follow FR-007; silent or non-s
 
 Each initializer returns a configured instance on success. All are `throws`; setup error types are not specified.
 Closure arguments use `@escaping`.
+The fixed shortcut is represented by the string `"control-double-tap"`.
 
 | Class | Exact initializer signature | Injected dependencies | Spec rule |
 |---|---|---|---|
