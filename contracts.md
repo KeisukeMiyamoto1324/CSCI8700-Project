@@ -1,6 +1,6 @@
 # Contracts
 
-These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
+These contracts describe the Swift modules in `CSCI8700-Project/Modules/`. The revised result cases and notification dependency below still need to be reflected in the skeleton and tests.
 All module classes and protocols use `@MainActor`.
 Every initializer and method currently throws `SkeletonError.notImplemented`.
 The tables describe the intended behavior; business logic is not implemented.
@@ -11,42 +11,35 @@ The tables describe the intended behavior; business logic is not implemented.
 |---|---|---|---|
 | Recording: `start() throws -> Void` | Starts one microphone recording. | Throws on capture failure. | FR-001 |
 | Recording: `stop() throws -> AVAudioPCMBuffer` | Stops recording and returns the recorded audio. | Throws on capture failure. | FR-001 |
-| Transcription: `transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String` | Returns a local transcription in the selected language. | Throws on local inference failure. | FR-001, FR-005 |
+| Transcription: `transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String` | Returns a local transcription in the selected language, or an empty string for silent or non-speech audio. | Throws on local inference failure. | FR-001, FR-005, FR-008 |
 | TextCorrection: `correct(text: String, language: Language, applicationBundleIdentifier: String?) throws -> String` | Returns locally corrected text, preserving meaning and applying the application's format and style. | Throws on local inference failure. | FR-002, FR-004, FR-005 |
 | ClipboardPaste: `currentApplicationBundleIdentifier() throws -> String?` | Returns the active application's bundle identifier, or `nil` if unavailable. | Throws on application lookup failure. | FR-004 |
-| ClipboardPaste: `paste(text: String) throws -> Bool` | With an editable field selected, writes the clipboard, sends paste, and returns `true`. Otherwise returns `false` without writing the clipboard or sending paste. | Throws on focus, clipboard, or paste-command failure. | FR-003, FR-006* |
-| VoiceTypingFlow: `handleShortcut() throws -> ShortcutResult` | Idle: starts recording and returns `.recordingStarted`. Recording: stops, transcribes, corrects, and attempts paste. Pending: retries paste. Returns `.pasted` and clears pending text after delivery, or `.pending` and retains text when no field is selected. | Throws when a called dependency fails. | FR-001–FR-006, AC-001* |
+| ClipboardPaste: `paste(text: String) throws -> Bool` | With an editable field selected, writes the clipboard, sends paste, and returns `true`. Otherwise returns `false` without writing the clipboard or sending paste. | Throws on focus, clipboard, or paste-command failure. | FR-003, FR-006 |
+| VoiceTypingFlow: `handleShortcut() throws -> ShortcutResult` | Idle: starts recording on a Control double-tap and returns `.recordingStarted`. Recording: stops, transcribes, corrects, and attempts paste. Returns `.pasted` after delivery, or `.discarded` for empty transcription or no editable selection. Undelivered text is discarded without retry. | On inference failure, displays a macOS notification and discards recording and intermediate text before throwing. Other dependency failures throw; undelivered text is discarded without retry. | FR-001–FR-008, AC-001 |
 
 `true` / `.pasted` means the paste command completed; it does not confirm that the destination application inserted the text.
-Error types and recovery after dependency failures are not specified.
+Error types are not specified. Inference failures follow FR-007; silent or non-speech audio follows FR-008.
 
 ## Initializers and injected dependencies
 
 Each initializer returns a configured instance on success. All are `throws`; setup error types are not specified.
-Closure arguments are `@escaping`, as declared in the skeleton.
+Closure arguments use `@escaping`.
 
 | Class | Exact initializer signature | Injected dependencies | Spec rule |
 |---|---|---|---|
 | Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` | Microphone start and stop operations. | FR-001 |
 | Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference. | FR-001, FR-005 |
 | TextCorrection | `init(localInference: @escaping (String, Language, String?) throws -> String) throws` | Local MLX text inference with application context. | FR-002, FR-004, FR-005 |
-| ClipboardPaste | `init(activeApplication: @escaping () throws -> String?, hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Application lookup, focus inspection, clipboard writing, and paste command. | FR-003, FR-004, FR-006* |
-| VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void) throws` | Four module contracts, language, user shortcut, and shortcut registration. | FR-001–FR-006, AC-001* |
+| ClipboardPaste | `init(activeApplication: @escaping () throws -> String?, hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Application lookup, focus inspection, clipboard writing, and paste command. | FR-003, FR-004, FR-006 |
+| VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` | Four module contracts, language, fixed Control double-tap shortcut and registration, and macOS inference-failure notification. | FR-001–FR-008, AC-001 |
 
 ## Shared types
 
 | Type | Values |
 |---|---|
 | `Language: String, CaseIterable` | `english = "en"`, `arabic = "ar"`, `chinese = "zh"`, `french = "fr"`, `german = "de"`, `italian = "it"`, `japanese = "ja"`, `korean = "ko"`, `portuguese = "pt"`, `spanish = "es"` |
-| `ShortcutResult: Equatable` | `.recordingStarted`, `.pasted`, `.pending` |
+| `ShortcutResult: Equatable` | `.recordingStarted`, `.pasted`, `.discarded` |
 | `SkeletonError: Error` | `.notImplemented` |
-
-## Open specification points
-
-- **FR-006:** The spec selects the destination when recording stops; the architecture checks focus at paste time. The skeleton follows the architecture. These timing rules need agreement.
-- **Pending text:** The architecture defines retention and retry, but references AC-002, which is absent from `spec.md`. Its NFR-001 and NFR-003 references are also absent.
-
-The starred entries follow the architecture where these gaps apply. No extra public methods are proposed.
 
 ## Start the skeleton
 

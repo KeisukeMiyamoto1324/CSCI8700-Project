@@ -26,12 +26,14 @@ Local AI Voice Typing Assistant is macOS software that turns speech into natural
 
 # Functional Requirements
 
-- **FR-001:** As an administrative office assistant, I want to start and stop voice recording with a keyboard shortcut that I set and have my speech transcribed locally, so that I can create work documents efficiently while protecting confidential information.
+- **FR-001:** As an administrative office assistant, I want to start and stop voice recording by double-tapping the Control key and have my speech transcribed locally, so that I can create work documents efficiently while protecting confidential information.
 - **FR-002:** As an administrative office assistant, I want the system to correct spelling errors and unnatural wording in my transcribed text locally, so that I can enter natural, accurate text that preserves my intended meaning.
-- **FR-003:** As an administrative office assistant, I want the corrected text to be entered directly into the selected text field, so that I can enter polished text into the active application without manually copying and pasting it.
+- **FR-003:** As an administrative office assistant, I want the corrected text to be entered into the selected text field using the system clipboard and paste command, so that I can enter polished text into the active application without manually copying and pasting it.
 - **FR-004:** As a user, I want the system to adjust the text's format and writing style based on the application I am using, so that the text fits that application.
 - **FR-005:** The system shall support voice input and text correction in English, Arabic, Chinese, French, German, Italian, Japanese, Korean, Portuguese, and Spanish.
-- **FR-006:** The system shall insert the corrected text into the text field selected when recording stops, even if the selected field changes during recording.
+- **FR-006:** The system shall insert the corrected text into the text field selected at paste time. If no editable field is selected or delivery fails, the system shall discard the undelivered text without retrying.
+- **FR-007:** If transcription or text correction inference fails, the system shall display a macOS notification and discard the recording and all intermediate text.
+- **FR-008:** For silent or otherwise non-speech audio, the system shall end recording without inserting text or taking further action.
 
 # Acceptance Criteria
 
@@ -43,9 +45,13 @@ Feature: Local voice typing
   Scenario: Enter corrected text using voice
     Given the voice typing assistant is running with local models ready
     And the user has selected a text field in a document application
-    When the user presses the recording shortcut
+    When the user double-taps the Control key
     And speaks a sentence
-    And presses the shortcut again to stop recording
+    And double-taps the Control key again to stop recording
     Then the system transcribes the speech and corrects spelling errors locally
     And enters the corrected text into the selected text field
 ```
+
+# Scope
+
+Local models and required permissions are prepared during initial setup. Runtime handling of missing models or permissions, and concurrent operations, are outside this project’s scope.
