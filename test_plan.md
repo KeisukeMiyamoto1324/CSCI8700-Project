@@ -1,0 +1,37 @@
+# Test plan
+
+Source: `spec.md` and `architecture.md` only. No implementation inspected.
+
+This is a desktop flow, so “status” means an observed outcome, not an HTTP code. “Body” means returned text or visible field content; neither document defines response fields. All expected results below are derived manually. Exact model wording is unspecified: check meaning and required corrections, not an invented exact string. `TBD` means the documents supply no expected result; it is not a pass condition.
+
+## Acceptance criteria
+
+| ID | Requirement | Cases (request/call; expected status; expected body fields; expected side effects) | Inside/outside | Control |
+|---|---|---|---|---|
+| AC-001 | Functional Requirements FR-001, FR-002, FR-003; Description (local processing) | With local models ready and editable field A selected, press the configured shortcut, say “Please send teh report tomorrow,” then press it again. **Status:** recording starts, stops, and delivery completes. **Body:** corrected text spells “the” correctly and preserves the request and tomorrow; exact wording otherwise unspecified. **Side effects:** transcription precedes correction, corrected text appears in A without manual paste, and audio/text never leave the Mac. | No numeric limit is specified. Models-ready and editable-field conditions are the accepted starting conditions; their outside cases are extras below. | No rejection in AC-001. The successful flow is the baseline control. |
+
+## Extra cases from the gap checklist
+
+Rows marked **extra** are probes, not additional acceptance criteria. Architecture-only behavior is identified explicitly.
+
+| ID | Requirement | Cases (request/call; expected status; expected body fields; expected side effects) | Inside/outside | Control |
+|---|---|---|---|---|
+| extra—boundaries / input types | FR-005 | Repeat AC-001 with English “Thank you,” Arabic “شكراً,” Chinese “谢谢,” French “Merci,” German “Danke,” Italian “Grazie,” Japanese “ありがとうございます,” Korean “감사합니다,” Portuguese “Obrigado,” and Spanish “Gracias.” **Status:** successful transcription, correction, and delivery. **Body:** each remains an expression of thanks in its original language; punctuation may vary. **Side effects:** text enters A locally. | Inside: each of the 10 named languages. Outside: Russian “Спасибо”; behavior **TBD**, since support outside the list is not prohibited. No duration, length, or size limits exist. | If Russian is rejected, use the same recording/field/model setup with English; verify the rejected run creates no recording result, transcript, corrected result, or field text beyond any explicitly permitted artifacts (**TBD**). |
+| extra—meaning / context / returned text | FR-002, FR-004 | Run matched recordings in two different applications: “Please schedule the meeting for Tuesday, not Thursday.” **Status:** corrected, delivered. **Body:** retains Tuesday as the requested day and excludes Thursday; style fits each application. **Side effects:** each selected field receives its result locally. Application-specific formatting and exact returned representation are **TBD**. | No style rules or application coverage limits are defined. | No rejection required. |
+| extra—identity / time | FR-006; architecture §§3–4 | Start in A, select B before stopping, stop, then select C before delivery. **Spec status/body/effect:** delivery targets B and inserts the corrected sentence there; A and C remain unchanged. **Architecture:** selects C at paste time instead. Treat this as a conflict, not two passing outcomes. | Inside timing: select B just before stopping. Outside timing: select C just after stopping, before delivery. No elapsed-time threshold is specified. | Keep B selected through delivery with the same recording; B receives the text. No rejection required. |
+| extra—state / concurrency | Architecture §3 only; claimed FR-006 / missing AC-002 | Stop with no editable field selected; await correction, then press the shortcut again with no field. **Status:** delivery deferred both times. **Body:** same pending corrected text retained. **Side effects:** no paste, field text, new recording, or additional transcript/corrected result is created by the retry. Then select A and retry: **status:** delivered; **body:** pending text in A; pending state clears after the attempt. A shortcut during transcription/correction, or simultaneous shortcut events: outcomes **TBD**. | Editable field selected versus none; pending result absent versus present. Architecture holds one pending result; overflow behavior is undefined. | For each deferred attempt, repeat the same attempt with only an editable field selected: paste succeeds. Preserve the existing pending result during deferral; “nothing created” does not mean deleting it. |
+| extra—errors / precedence | AC-001 starting conditions; FR-001 | Separately run the baseline with (a) models not ready, (b) microphone permission denied, or (c) paste permission denied. Each changes only one condition. **Status/body/side effects:** **TBD**; error messages, cleanup, retry, and precedence are unspecified. Do not invent rejection assertions. | Ready/not ready; each permission granted/denied. No timeout is specified. | For any specified rejection, restore only that condition and repeat AC-001 successfully. Once cleanup rules exist, verify no new recording artifact, transcript, corrected result, or field text remains from the rejected run except explicitly allowed retained data. Multi-error precedence needs a rule; do not create a rejection request with two faults. |
+| extra—listing | Domain Model; Functional Requirements | No list operation is required. Whether recordings, transcripts, pending text, or history can be listed, and their order/filtering/returned fields, are **TBD**. No call or expected status can be defined from these documents. | No listing limit exists. | No specified rejection or control. |
+
+## Spec gaps
+
+| Gap | Unresolved detail |
+|---|---|
+| Requirements with no acceptance criterion | FR-004, FR-005, FR-006. AC-001 links FR-001–003, but does not explicitly test configuring the shortcut, unnatural wording, or preserving meaning. |
+| Acceptance criteria with no requirement | None in `spec.md`: AC-001 maps to FR-001–003. Architecture references AC-002, which is absent. |
+| Missing requirements referenced by architecture | Nonfunctional Requirements section and NFR-001 / NFR-003 are absent. No stated latency, memory, recording-length, or quality thresholds exist. |
+| Destination timing conflict | FR-006 fixes the destination at recording stop; architecture selects it at paste time. |
+| Architecture claims beyond the spec | Clipboard delivery, pending-result retention, shortcut retries, and clearing pending text after a paste attempt are not defined by FR-003/FR-006 as claimed. Failed-paste retention and clipboard restoration are unspecified. |
+| Undefined outcomes | Missing readiness, permission, inference, empty/silent/invalid audio, unsupported-language, concurrency, timeout, cleanup, error precedence, application-style, and listing contracts prevent concrete expected results for those probes. No rejection contract defines precisely what “nothing created” must cover. |
+
+For every rejection eventually specified, change exactly one condition from its accepted control and check that nothing is created, including no destination edit or new stored artifact. Undefined cases above remain open; do not infer rejection from missing support.
