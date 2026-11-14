@@ -1,16 +1,15 @@
 # Contracts
 
-These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
+These are the target contracts for `CSCI8700-Project/Modules/`; implementation and tests must be aligned with this update.
 All module classes and protocols use `@MainActor`.
 Slice 1 implements dependency forwarding, shortcut registration, and the successful
-recording-to-paste flow. The current implementation reads the application identifier
-before correction; this identifier must not affect correction under revised FR-004.
+recording-to-paste flow.
 Slice 2 discards transcription that is empty after trimming `.whitespacesAndNewlines`,
-without application lookup, correction, delivery, or notification. Nonempty text
+without correction, delivery, or notification. Nonempty text
 is forwarded unchanged. Slice 3 invokes the injected notification once when
 transcription or correction throws, then rethrows the original error. Intermediate
 audio and text remain local to the call; the next shortcut starts fresh capture.
-Lookup and delivery failures do not trigger inference notifications.
+Delivery failures do not trigger inference notifications.
 Slice 4 verifies that selection is checked during paste. No editable selection means no
 clipboard write or paste command.
 Slice 5 verifies rejection and focus/clipboard/paste failures: no retained pending
@@ -36,9 +35,7 @@ production model dependency is not connected yet.
 The production `TextCorrection.localInference` dependency shall use
 [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
 locally through MLX, using the existing text and language arguments and the
-repository's `4bit/` variant. The existing `applicationBundleIdentifier` argument
-is retained for signature compatibility but shall not affect the prompt or output.
-Use identical minimal-correction rules for all identifiers, including `nil`:
+repository's `4bit/` variant. Use identical minimal-correction rules in every application:
 preserve language and meaning, fix spelling/grammar/unnatural wording, preserve
 names/numbers/negations/dates, and add no information or explanation. Prompt and inference
 integration remain undecided.
@@ -50,8 +47,7 @@ Injected test closures do not establish correction quality or language coverage.
 | Recording: `start() throws -> Void` | Starts one microphone recording. | Throws on capture failure. | FR-001 |
 | Recording: `stop() throws -> AVAudioPCMBuffer` | Stops recording and returns the recorded audio. | Throws on capture failure. | FR-001 |
 | Transcription: `transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String` | Returns a local transcription in the selected language, or an empty string for silent or non-speech audio. | Throws on local inference failure. | FR-001, FR-005, FR-008 |
-| TextCorrection: `correct(text: String, language: Language, applicationBundleIdentifier: String?) throws -> String` | Returns locally corrected text using the same minimal-correction rules in every application, preserving language and meaning. The application identifier does not affect correction. | Throws on local inference failure. | FR-002, FR-004, FR-005 |
-| ClipboardPaste: `currentApplicationBundleIdentifier() throws -> String?` | Returns the active application's bundle identifier, or `nil` if unavailable. Retained for compatibility; not used to choose correction rules. | Throws on application lookup failure. | Existing interface; no application-dependent correction requirement |
+| TextCorrection: `correct(text: String, language: Language) throws -> String` | Returns locally corrected text using the same minimal-correction rules in every application, preserving language and meaning. | Throws on local inference failure. | FR-002, FR-004, FR-005 |
 | ClipboardPaste: `paste(text: String) throws -> Bool` | With an editable field selected, writes the clipboard, sends paste, and returns `true`. Otherwise returns `false` without writing the clipboard or sending paste. | Throws on focus, clipboard, or paste-command failure. | FR-003, FR-006 |
 | VoiceTypingFlow: `handleShortcut() throws -> ShortcutResult` | Idle: starts recording on a Control double-tap and returns `.recordingStarted`. Recording: stops, transcribes, corrects, and attempts paste. Returns `.pasted` after delivery, or `.discarded` for empty transcription or no editable selection. Undelivered text is discarded without retry. | On inference failure, displays a macOS notification and discards recording and intermediate text before throwing. Other dependency failures throw; undelivered text is discarded without retry. | FR-001–FR-008, AC-001 |
 
@@ -70,8 +66,8 @@ The fixed shortcut is represented by the string `"control-double-tap"`.
 |---|---|---|---|
 | Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` | Microphone start and stop operations. | FR-001 |
 | Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference using `mlx-community/whisper-large-v3-turbo-4bit` in production. | FR-001, FR-005; Technical Constraints |
-| TextCorrection | `init(localInference: @escaping (String, Language, String?) throws -> String) throws` | Local MLX `LiquidAI/LFM2.5-2.6B-MLX` inference using `4bit/` and application-independent correction rules in production. | FR-002, FR-004, FR-005; Technical Constraints |
-| ClipboardPaste | `init(activeApplication: @escaping () throws -> String?, hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Application lookup, focus inspection, clipboard writing, and paste command. | FR-003, FR-004, FR-006 |
+| TextCorrection | `init(localInference: @escaping (String, Language) throws -> String) throws` | Local MLX `LiquidAI/LFM2.5-2.6B-MLX` inference using `4bit/` and application-independent correction rules in production. | FR-002, FR-004, FR-005; Technical Constraints |
+| ClipboardPaste | `init(hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Focus inspection, clipboard writing, and paste command. | FR-003, FR-006 |
 | VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` | Four module contracts, language, fixed Control double-tap shortcut and registration, and macOS inference-failure notification. | FR-001–FR-008, AC-001 |
 
 ## Shared types

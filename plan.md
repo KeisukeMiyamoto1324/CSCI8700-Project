@@ -11,17 +11,17 @@ architecture, contracts, and existing tests remain unchanged.
 Source references: architecture §1–§6; contracts “Methods,” “Initializers and injected dependencies,” and “Shared types.” `spec.md` has no numbered sections, so references below use its headings and FR IDs rather than inventing section numbers.
 
 1. **Name:** Successful voice flow.
-   **Goal:** Carry one English recording through transcription, correction, application lookup, and clipboard delivery using the injected dependencies.
+   **Goal:** Carry one English recording through transcription, correction, and clipboard delivery using the injected dependencies.
    **Spec sources:** spec “Acceptance Criteria” AC-001 and “Functional Requirements” FR-001–FR-003; architecture §2, §3 steps 1–4, §4; contracts Methods and Initializers.
    **Criteria:** AC-001 (suite coverage; real-device validation remains necessary).
    **Tests that should turn green:** `test_AC001`.
    **Depends on:** None.
    **Done when:** The listed test passes and no previously passing test fails; real-device AC-001 validation is required before claiming product acceptance.
    **Status:** implemented; `test_AC001` passes. Real-device acceptance remains unverified.
-   Scope includes all five initializers, `Recording.start/stop`, `Transcription.transcribe`, `TextCorrection.correct`, `ClipboardPaste.currentApplicationBundleIdentifier/paste`, and `VoiceTypingFlow.handleShortcut`. Register the shortcut handler and alternate start/stop. Keep this first slice to the successful request flow.
+   Scope includes all five initializers, `Recording.start/stop`, `Transcription.transcribe`, `TextCorrection.correct`, `ClipboardPaste.paste`, and `VoiceTypingFlow.handleShortcut`. Register the shortcut handler and alternate start/stop. Keep this first slice to the successful request flow.
 
 2. **Name:** Silent input.
-   **Goal:** Discard empty or whitespace/newline-only transcription without application lookup, correction, delivery, notification, or retained data.
+   **Goal:** Discard empty or whitespace/newline-only transcription without correction, delivery, notification, or retained data.
    **Spec sources:** spec Functional Requirements FR-008; architecture §3 step 2; contracts Transcription and VoiceTypingFlow Methods.
    **Criteria:** None; FR-008 has no acceptance criterion.
    **Tests that should turn green:** `test_FR008_discardsEmptyTranscription`, `test_FR008_discardsWhitespaceOnlyTranscription`, `test_FR008_startsFreshRecordingAfterDiscard`, `test_FR008_preservesNonemptyTranscription`.
@@ -33,7 +33,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Goal:** Notify once and discard recording and intermediate text when either inference stage throws, then propagate the failure.
    **Spec sources:** spec Functional Requirements FR-007; architecture §3 step 6; contracts VoiceTypingFlow Methods.
    **Criteria:** None; FR-007 has no acceptance criterion.
-   **Tests that should turn green:** `test_FR007_notifiesOnTranscriptionFailureAndRecovers`, `test_FR007_notifiesOnCorrectionFailureAndRecovers`. Boundary controls: `test_FR007_doesNotNotifyOnApplicationLookupFailure`, `test_FR007_doesNotNotifyOnPasteFailure`.
+   **Tests that should turn green:** `test_FR007_notifiesOnTranscriptionFailureAndRecovers`, `test_FR007_notifiesOnCorrectionFailureAndRecovers`. Boundary controls: `test_FR007_doesNotNotifyOnPasteFailure`.
    **Depends on:** 1, 2.
    **Done when:** The listed tests pass and no previously passing test fails; verify both inference-failure probes and a fresh successful run from test_plan “Extra cases.”
    **Status:** implemented; automated results recorded in test_results.md. Actual macOS notification delivery remains unverified.
@@ -81,9 +81,9 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Criteria:** None completed; AC-001 remains assigned to slice 1 and requires actual LLM correction and full real-device validation.
    **Tests that should turn green:** None in the current suite establishes real OS integration; planned real-device checks DEV-8-01–DEV-8-07 are defined in test_plan.md. All existing 16 tests must remain passing.
    **Depends on:** 1–5, 7. Can be implemented before slice 6; initial demo uses English.
-   **Done when:** With model files and microphone, focus/paste, shortcut, and notification permissions prepared during setup, real Control double-taps drive VoiceTypingFlow from capture through transcription and clipboard paste. The development-only TextCorrection closure returns input unchanged. The destination is checked at paste time; absent selection, silent input, and failures follow existing discard/no-retry rules. Transcription failure triggers a real macOS notification. DEV-8-01–DEV-8-07 are verified on the Mac, outcomes are recorded, and all existing tests pass without regression. No runtime audio or text leaves the Mac.
+   **Done when:** With model files and microphone, focus/paste, shortcut, and notification permissions prepared during setup, real Control double-taps drive VoiceTypingFlow from capture through transcription and clipboard paste. The development-only TextCorrection closure returns input unchanged. The destination is checked at paste time; absent selection, silent input, and failures follow existing discard/no-retry rules. Transcription failure triggers a real macOS notification. DEV-8-01–DEV-8-07 are verified on the Mac, outcomes are recorded, and all retained existing tests pass without regression. No runtime audio or text leaves the Mac.
    **Status:** not started.
-   Wire existing injected dependencies for shortcut registration, active application lookup, editable focus inspection, clipboard writing, paste command, and inference-failure notification. Do not add a new processing route around VoiceTypingFlow or alter contracted signatures. The app must identify this development stage as having no LLM correction; retain no pending text for retry. UI behavior during capture/inference, shortcut timing, and OS dependency composition must be resolved before implementation.
+   Wire existing injected dependencies for shortcut registration, editable focus inspection, clipboard writing, paste command, and inference-failure notification. Do not add a new processing route around VoiceTypingFlow or alter contracted signatures. The app must identify this development stage as having no LLM correction; retain no pending text for retry. UI behavior during capture/inference, shortcut timing, and OS dependency composition must be resolved before implementation.
 
 ## Test issues
 
@@ -91,7 +91,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 - Slices 7–8 need real microphone/model/OS validation; injected-closure tests do not demonstrate working speech recognition, in-app results, global shortcuts, or external field insertion. Their DEV checks are planned manual checks, not implemented XCTest methods or passing results.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
-- Exact generated wording is not fixed. Verify minimal correction, preserved meaning/language, and that application identifiers do not affect the correction prompt or rules.
+- Exact generated wording is not fixed. Verify minimal correction, preserved meaning/language, consistent correction rules in every application.
 
 ## Selected speech model
 
@@ -125,15 +125,14 @@ or contracted signature is required.
 - Before slice 8: decide Control double-tap timing and event handling, real editable-focus inspection and paste support, notification wiring, and UI behavior during capture/inference. Define setup permissions and a repeatable way to exercise inference and delivery failures without changing the final contracts.
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
 - Which correction prompt should be used for the selected 4-bit LFM model, and how should Swift invoke it? Both model choices and precisions, and Silero VAD selection, are fixed above; inference integration, correction-quality validation, and VAD runtime/settings remain pending. Model files are prepared during setup.
-- FR-004 uses identical correction rules for all applications, including unknown identifiers and nil. Keep the existing application-identifier argument for compatibility, but do not use it in the correction prompt. Destination focus is still checked at paste time.
-- What cleanup is expected after capture or application-lookup failures beyond the contracted throw/discard behavior?
+- What cleanup is expected after capture failures beyond the contracted throw/discard behavior?
 
 ## Coverage audit
 
-Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2; the four FR-007 tests belong only to slice 3.
+Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2; the retained FR-007 tests belong only to slice 3; obsolete interface tests need alignment with the revised contracts.
 The three selection tests listed in slice 4 belong only to slice 4; the four
 delivery-discard/recovery tests listed in slice 5 belong only to slice 5.
 
-Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; slice 8 plans global shortcut, external clipboard delivery, and notification wiring. DEV-7 checks belong only to slice 7; DEV-8 checks belong only to slice 8. Real LLM correction integration remains unfinished; the temporary identity closure does not fulfill TextCorrection's final behavior.
+The revised contracts require implementation/test alignment; earlier slice results describe the interfaces at the time they were tested. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; slice 8 plans global shortcut, external clipboard delivery, and notification wiring. DEV-7 checks belong only to slice 7; DEV-8 checks belong only to slice 8. Real LLM correction integration remains unfinished; the temporary identity closure does not fulfill TextCorrection's final behavior.
 
 Next action: Slice 7, Minimal real-device transcription — decide the Swift-to-MLX integration approach before implementation; slice 6 remains pending.
