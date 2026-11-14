@@ -23,13 +23,15 @@ protocol TranscriptionContract {
 
 @MainActor
 final class Transcription: TranscriptionContract {
+    private let localInference: (AVAudioPCMBuffer, Language) throws -> String
+
     init(
         localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String
     ) throws {
-        throw SkeletonError.notImplemented
+        self.localInference = localInference
     }
 
     func transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String {
-        throw SkeletonError.notImplemented
+        return try localInference(audio, language)
     }
 }

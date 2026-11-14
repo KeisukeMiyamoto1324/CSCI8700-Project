@@ -2,8 +2,23 @@
 
 These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
 All module classes and protocols use `@MainActor`.
-Every initializer and method currently throws `SkeletonError.notImplemented`.
-The tables describe the intended behavior; business logic is not implemented.
+Slice 1 implements dependency forwarding, shortcut registration, and the successful
+recording-to-paste flow. Application context is read immediately before correction.
+Slice 2 discards transcription that is empty after trimming `.whitespacesAndNewlines`,
+without application lookup, correction, delivery, or notification. Nonempty text
+is forwarded unchanged. Slice 3 invokes the injected notification once when
+transcription or correction throws, then rethrows the original error. Intermediate
+audio and text remain local to the call; the next shortcut starts fresh capture.
+Lookup and delivery failures do not trigger inference notifications.
+Slice 4 verifies that selection is checked during paste, independently of the
+application context read before correction. No editable selection means no
+clipboard write or paste command.
+Slice 5 verifies rejection and focus/clipboard/paste failures: no retained pending
+text, no retry or inference notification, and fresh capture on the next shortcut.
+Errors propagate unchanged. Paste failure may leave the clipboard already written;
+no clipboard rollback is promised.
+The tables describe the full intended behavior. Real microphone, MLX, and
+macOS operations are not wired into the app yet.
 
 ## Methods
 
@@ -19,6 +34,8 @@ The tables describe the intended behavior; business logic is not implemented.
 
 `true` / `.pasted` means the paste command completed; it does not confirm that the destination application inserted the text.
 Error types are not specified. Inference failures follow FR-007; silent or non-speech audio follows FR-008.
+For VoiceTypingFlow, empty transcription includes whitespace/newline-only output.
+After discarding it, the next shortcut starts a fresh recording.
 
 ## Initializers and injected dependencies
 

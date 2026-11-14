@@ -14,10 +14,12 @@ protocol TextCorrectionContract {
 
 @MainActor
 final class TextCorrection: TextCorrectionContract {
+    private let localInference: (String, Language, String?) throws -> String
+
     init(
         localInference: @escaping (String, Language, String?) throws -> String
     ) throws {
-        throw SkeletonError.notImplemented
+        self.localInference = localInference
     }
 
     func correct(
@@ -25,6 +27,6 @@ final class TextCorrection: TextCorrectionContract {
         language: Language,
         applicationBundleIdentifier: String?
     ) throws -> String {
-        throw SkeletonError.notImplemented
+        return try localInference(text, language, applicationBundleIdentifier)
     }
 }

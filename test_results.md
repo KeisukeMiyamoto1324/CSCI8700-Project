@@ -1,4 +1,131 @@
-# AC-001 test result
+# Test results
+
+## Slice 5 result
+
+Added `test_FR006_discardsRejectedDeliveryWithoutRetry`,
+`test_FR006_discardsTextAfterFocusFailureWithoutRetry`,
+`test_FR006_discardsTextAfterClipboardFailureWithoutRetry`, and
+`test_FR006_discardsTextAfterPasteFailureWithoutRetry`.
+
+Each case checks unchanged field content on failure/rejection, original error
+identity where throwing, no notification or automatic retry, audio release, and
+fresh capture followed by exactly one delivery of new text. A failed paste may
+leave the clipboard written; rollback is not expected. These tests extend the
+Slice 3 paste-error boundary check with coverage of all delivery failure stages.
+
+Existing request-local state, idle transition before inference/delivery, and error
+propagation already implement the required behavior; no production change was
+necessary. Real macOS clipboard/focus/paste failures remain unverified.
+Full-suite command is the same as Slice 3 below.
+Output: `/tmp/csci8700-slice5-test-output.log`.
+
+```text
+Executed 16 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+## Slice 4 result
+
+Added `test_FR006_pastesIntoSelectionChangedBeforePaste`,
+`test_FR006_pastesIntoUnchangedSelection`, and
+`test_FR006_skipsClipboardAndPasteWithoutEditableSelection`.
+They cover A → B → C selection changes, the B-selection control, and absence of
+editable selection. Only the final selected field changes; no selection leaves
+the clipboard untouched and sends no paste or notification.
+
+The existing implementation already supplies this behavior; no production-code
+change was necessary. Full-suite command is the same as Slice 3 below.
+Actual macOS focus and paste are simulated, not validated.
+Output: `/tmp/csci8700-slice4-test-output.log`.
+
+```text
+Executed 12 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+## Slice 3 result (2026-11-13)
+
+Added four FR-007 tests; existing tests were unchanged. Before implementation,
+the transcription and correction failure tests failed because notification was
+missing. The other seven tests passed. Output: `/tmp/csci8700-slice3-red.log`.
+
+Full suite command:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+After implementation:
+
+```text
+test_FR007_notifiesOnTranscriptionFailureAndRecovers passed
+test_FR007_notifiesOnCorrectionFailureAndRecovers passed
+test_FR007_doesNotNotifyOnApplicationLookupFailure passed
+test_FR007_doesNotNotifyOnPasteFailure passed
+Executed 9 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Both inference-failure cases verify exactly one notification, original error
+identity, no delivery or clipboard changes, audio release after the call, and a
+fresh successful recording without old-text retry. Lookup and paste failures
+verify no inference notification; paste failure does not assume clipboard rollback.
+The injected notification callback is tested, not actual macOS notification delivery.
+Full output: `/tmp/csci8700-slice3-test-output.log`.
+
+## Slice 2 result (2026-11-13)
+
+Added four FR-008 tests without changing `test_AC001`. Before implementation,
+three new tests failed and the nonempty-text test and AC-001 passed (34 assertion
+failures across five tests). The failures showed blank text reaching correction
+and delivery. Red-run output: `/tmp/csci8700-slice2-red.log`.
+
+After implementation, the full suite passed:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+```text
+test_AC001 passed
+test_FR008_discardsEmptyTranscription passed
+test_FR008_discardsWhitespaceOnlyTranscription passed
+test_FR008_preservesNonemptyTranscription passed
+test_FR008_startsFreshRecordingAfterDiscard passed
+Executed 5 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Checks cover empty, space, tab, newline, mixed and Unicode whitespace; no
+application lookup/correction/focus/clipboard/paste/notification on discard;
+unchanged clipboard; fresh recording and successful delivery after discard;
+and unchanged nonempty text including surrounding whitespace. Actual model
+silence detection is not tested. Full output: `/tmp/csci8700-slice2-test-output.log`.
+
+## Slice 1 result (2026-11-13)
+
+Full suite command:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+```text
+Test Case '-[CSCI8700_ProjectTests.VoiceTypingAcceptanceTests test_AC001]' passed (0.001 seconds).
+Executed 1 test, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Tests were unchanged. This verifies the injected successful flow, not real model
+inference or macOS delivery. Full output: `/tmp/csci8700-slice1-test-output.log`.
+
+## Original skeleton baseline
 
 Framework: XCTest. Run on macOS (Apple Silicon).
 

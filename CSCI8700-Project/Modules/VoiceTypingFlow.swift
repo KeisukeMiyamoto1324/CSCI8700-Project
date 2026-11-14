@@ -18,6 +18,14 @@ enum ShortcutResult: Equatable {
 // ---------------------------------------------------------
 @MainActor
 final class VoiceTypingFlow {
+    private let recording: any RecordingContract
+    private let transcription: any TranscriptionContract
+    private let textCorrection: any TextCorrectionContract
+    private let clipboardPaste: any ClipboardPasteContract
+    private let language: Language
+    private let notifyInferenceFailure: () -> Void
+    private var isRecording = false
+
     init(
         recording: any RecordingContract,
         transcription: any TranscriptionContract,
@@ -28,10 +36,72 @@ final class VoiceTypingFlow {
         registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void,
         notifyInferenceFailure: @escaping () -> Void
     ) throws {
-        throw SkeletonError.notImplemented
+        self.recording = recording
+        self.transcription = transcription
+        self.textCorrection = textCorrection
+        self.clipboardPaste = clipboardPaste
+        self.language = language
+        self.notifyInferenceFailure = notifyInferenceFailure
+
+        // ---------------------------------------------------------
+        // Register without retaining the flow through the handler.
+        // ---------------------------------------------------------
+        try registerShortcut(shortcut) { [weak self] () throws -> Void in
+            _ = try self?.handleShortcut()
+        }
     }
 
     func handleShortcut() throws -> ShortcutResult {
-        throw SkeletonError.notImplemented
+        // ---------------------------------------------------------
+        // Start capture on the first shortcut and process on the next.
+        // ---------------------------------------------------------
+        guard isRecording else {
+            try recording.start()
+            isRecording = true
+            return .recordingStarted
+        }
+
+        let audio = try recording.stop()
+        isRecording = false
+        // ---------------------------------------------------------
+        // Notify only for transcription inference errors, then rethrow.
+        // Request-local audio and text are released when the call exits.
+        // ---------------------------------------------------------
+        let text: String
+        do {
+            text = try transcription.transcribe(audio: audio, language: language)
+        } catch {
+            notifyInferenceFailure()
+            throw error
+        }
+
+        // ---------------------------------------------------------
+        // Discard blank input without changing nonempty transcription.
+        // ---------------------------------------------------------
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .discarded
+        }
+
+        // ---------------------------------------------------------
+        // Read application context immediately before correction.
+        // Keep intermediate results local to this request.
+        // ---------------------------------------------------------
+        let application = try clipboardPaste.currentApplicationBundleIdentifier()
+        // ---------------------------------------------------------
+        // Keep lookup and delivery errors outside inference handling.
+        // ---------------------------------------------------------
+        let correctedText: String
+        do {
+            correctedText = try textCorrection.correct(
+                text: text,
+                language: language,
+                applicationBundleIdentifier: application
+            )
+        } catch {
+            notifyInferenceFailure()
+            throw error
+        }
+        let pasted = try clipboardPaste.paste(text: correctedText)
+        return pasted ? .pasted : .discarded
     }
 }
