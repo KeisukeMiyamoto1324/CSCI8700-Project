@@ -11,7 +11,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Tests that should turn green:** `test_AC001`.
    **Depends on:** None.
    **Done when:** The listed test passes and no previously passing test fails; real-device AC-001 validation is required before claiming product acceptance.
-   **Status:** not started.
+   **Status:** implemented; `test_AC001` passes. Real-device acceptance remains unverified.
    Scope includes all five initializers, `Recording.start/stop`, `Transcription.transcribe`, `TextCorrection.correct`, `ClipboardPaste.currentApplicationBundleIdentifier/paste`, and `VoiceTypingFlow.handleShortcut`. Register the shortcut handler and alternate start/stop. Keep this first slice to the successful request flow.
 
 2. **Name:** Silent input.
@@ -79,4 +79,4 @@ Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and
 
 Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Real dependency composition and placeholder UI replacement remain unresolved under Design questions, outside the contracted module surface.
 
-Next action: Slice 1, Successful voice flow — make `test_AC001` pass, starting with `Recording.init`.
+Next action: Slice 2, Silent input — add coverage for empty transcription before implementing its discard behavior.

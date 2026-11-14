@@ -2,8 +2,11 @@
 
 These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
 All module classes and protocols use `@MainActor`.
-Every initializer and method currently throws `SkeletonError.notImplemented`.
-The tables describe the intended behavior; business logic is not implemented.
+Slice 1 implements dependency forwarding, shortcut registration, and the successful
+recording-to-paste flow. Application context is read immediately before correction.
+The tables describe the full intended behavior; empty-transcription handling and
+inference-failure notification remain for later slices. Real microphone, MLX, and
+macOS operations are not wired into the app yet.
 
 ## Methods
 

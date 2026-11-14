@@ -1,5 +1,26 @@
 # AC-001 test result
 
+## Slice 1 result (2026-11-13)
+
+Full suite command:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+```text
+Test Case '-[CSCI8700_ProjectTests.VoiceTypingAcceptanceTests test_AC001]' passed (0.001 seconds).
+Executed 1 test, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Tests were unchanged. This verifies the injected successful flow, not real model
+inference or macOS delivery. Full output: `/tmp/csci8700-slice1-test-output.log`.
+
+## Original skeleton baseline
+
 Framework: XCTest. Run on macOS (Apple Silicon).
 
 ```sh
