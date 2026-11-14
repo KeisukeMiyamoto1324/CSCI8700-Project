@@ -1,4 +1,35 @@
-# AC-001 test result
+# Test results
+
+## Slice 2 result (2026-11-13)
+
+Added four FR-008 tests without changing `test_AC001`. Before implementation,
+three new tests failed and the nonempty-text test and AC-001 passed (34 assertion
+failures across five tests). The failures showed blank text reaching correction
+and delivery. Red-run output: `/tmp/csci8700-slice2-red.log`.
+
+After implementation, the full suite passed:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+```text
+test_AC001 passed
+test_FR008_discardsEmptyTranscription passed
+test_FR008_discardsWhitespaceOnlyTranscription passed
+test_FR008_preservesNonemptyTranscription passed
+test_FR008_startsFreshRecordingAfterDiscard passed
+Executed 5 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Checks cover empty, space, tab, newline, mixed and Unicode whitespace; no
+application lookup/correction/focus/clipboard/paste/notification on discard;
+unchanged clipboard; fresh recording and successful delivery after discard;
+and unchanged nonempty text including surrounding whitespace. Actual model
+silence detection is not tested. Full output: `/tmp/csci8700-slice2-test-output.log`.
 
 ## Slice 1 result (2026-11-13)
 
