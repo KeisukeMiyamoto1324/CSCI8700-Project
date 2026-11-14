@@ -52,6 +52,14 @@ Feature: Local voice typing
     And enters the corrected text into the selected text field
 ```
 
+# Technical Constraints
+
+Speech recognition shall use the 4-bit quantized MLX model
+[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
+(Whisper Large v3 Turbo), running locally on Apple Silicon. Model files are
+prepared during initial setup; runtime transcription shall not send audio or
+text to external servers. The text-correction LLM is not yet specified.
+
 # Scope
 
 Local models and required permissions are prepared during initial setup. Runtime handling of missing models or permissions, and concurrent operations, are outside this project’s scope.

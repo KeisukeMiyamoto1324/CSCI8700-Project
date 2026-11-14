@@ -66,10 +66,19 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
 
+## Selected speech model
+
+Speech model selection is resolved by spec Technical Constraints:
+[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit),
+the 4-bit quantized MLX Whisper Large v3 Turbo model. Runtime integration and
+real-model validation are not implemented. Validate local loading, ten-language
+transcription, and silence/non-speech behavior using test_plan's selected-model
+checks. Text-correction LLM selection remains open.
+
 ## Design questions
 
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
-- Which local models and silence-detection behavior meet the ten-language requirements? Model setup is out of scope; runtime inference still needs validation.
+- Which text-correction LLM and silence-detection behavior meet the requirements? The speech model is fixed above; its inference library and Swift integration remain undecided. Model files are prepared during setup; runtime integration and validation are still pending.
 - Which applications and formatting/style rules must TextCorrection support? When should application context be sampled? Destination focus is explicitly checked at paste time.
 - What cleanup is expected after capture or application-lookup failures beyond the contracted throw/discard behavior?
 

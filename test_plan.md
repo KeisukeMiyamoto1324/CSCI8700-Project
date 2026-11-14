@@ -25,6 +25,26 @@ These are additional probes, not acceptance criteria.
 
 Checklist: readiness and permission failures, concurrency, and error precedence involving simultaneous failures are outside scope. No listing operation is required. Timing, state, identity, input types, errors, and returned text are covered above.
 
+## Selected speech model validation
+
+Production speech recognition uses
+[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
+(MLX Whisper Large v3 Turbo, 4-bit quantization; spec Technical Constraints).
+After model files and permissions are prepared during setup, verify that runtime
+loads this model locally and performs transcription without sending audio or
+text to external servers. Record the resolved model revision with validation results.
+
+Run AC-001 and the ten-language and silence/non-speech probes above with actual
+recordings and the selected speech model. Verify that supported-language speech
+is transcribed in its original language and silence/non-speech yields an empty
+transcription with no downstream work. Check meaning rather than exact model
+wording. Full-flow validation also requires a configured local correction LLM.
+
+These are planned integration checks, not passing test results. The current
+injected-closure tests do not load the model or establish speech-recognition quality.
+The inference library, Swift integration, and silence-detection details remain
+to be decided; no thresholds or quality scores are specified here.
+
 ## Spec gaps
 
 | Gap | Unresolved detail |

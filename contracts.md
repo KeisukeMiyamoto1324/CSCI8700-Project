@@ -22,6 +22,14 @@ macOS operations are not wired into the app yet.
 
 ## Methods
 
+The production `Transcription.localInference` dependency shall run
+[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
+locally through MLX (Whisper Large v3 Turbo, 4-bit quantization), as required by
+spec Technical Constraints. Model files are prepared during initial setup.
+Injected test closures may supply fixed results; they do not validate model use,
+accuracy, or silence detection. Existing signatures are unchanged, and the
+production model dependency is not connected yet.
+
 | Module / signature | Success result and side effects | Failure | Spec rule |
 |---|---|---|---|
 | Recording: `start() throws -> Void` | Starts one microphone recording. | Throws on capture failure. | FR-001 |
@@ -46,7 +54,7 @@ The fixed shortcut is represented by the string `"control-double-tap"`.
 | Class | Exact initializer signature | Injected dependencies | Spec rule |
 |---|---|---|---|
 | Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` | Microphone start and stop operations. | FR-001 |
-| Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference. | FR-001, FR-005 |
+| Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference using `mlx-community/whisper-large-v3-turbo-4bit` in production. | FR-001, FR-005; Technical Constraints |
 | TextCorrection | `init(localInference: @escaping (String, Language, String?) throws -> String) throws` | Local MLX text inference with application context. | FR-002, FR-004, FR-005 |
 | ClipboardPaste | `init(activeApplication: @escaping () throws -> String?, hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Application lookup, focus inspection, clipboard writing, and paste command. | FR-003, FR-004, FR-006 |
 | VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` | Four module contracts, language, fixed Control double-tap shortcut and registration, and macOS inference-failure notification. | FR-001–FR-008, AC-001 |
