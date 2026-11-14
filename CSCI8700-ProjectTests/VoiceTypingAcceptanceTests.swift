@@ -4,6 +4,129 @@ import XCTest
 
 final class VoiceTypingAcceptanceTests: XCTestCase {
     @MainActor
+    func test_FR006_discardsRejectedDeliveryWithoutRetry() throws -> Void {
+        try checkUndeliveredText(
+            at: "selection", events: ["start", "stop", "transcribe", "correct", "focus"]
+        )
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterFocusFailureWithoutRetry() throws -> Void {
+        try checkUndeliveredText(
+            at: "focus", events: ["start", "stop", "transcribe", "correct", "focus"]
+        )
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterClipboardFailureWithoutRetry() throws -> Void {
+        try checkUndeliveredText(
+            at: "clipboard", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard"]
+        )
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterPasteFailureWithoutRetry() throws -> Void {
+        try checkUndeliveredText(
+            at: "paste", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"]
+        )
+    }
+
+    // ---------------------------------------------------------
+    // Reject or fail delivery once, then make the same dependency work.
+    // New capture must replace old text without retry or notification.
+    // ---------------------------------------------------------
+    @MainActor
+    private func checkUndeliveredText(at stage: String, events expectedEvents: [String]) throws -> Void {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let failure = NSError(domain: "DeliveryTests", code: 1)
+        var shouldFail = true
+        var captures = 0
+        var events: [String] = []
+        weak var capturedAudio: AVAudioPCMBuffer?
+        var clipboard = "Existing clipboard"
+        var field = "Existing field"
+        let recording = try Recording(
+            startCapture: {
+                events.append("start")
+                captures += 1
+            },
+            stopCapture: {
+                events.append("stop")
+                let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
+                capturedAudio = audio
+                return audio
+            }
+        )
+        let transcription = try Transcription(localInference: { audio, _ in
+            events.append("transcribe")
+            XCTAssertTrue(audio === capturedAudio)
+            return captures == 1 ? "Old transcript" : "Fresh transcript"
+        })
+        let correction = try TextCorrection(localInference: { text, _, _ in
+            events.append("correct")
+            XCTAssertEqual(text, captures == 1 ? "Old transcript" : "Fresh transcript")
+            return captures == 1 ? "Old correction" : "Fresh correction"
+        })
+        let paste = try ClipboardPaste(
+            activeApplication: { "com.apple.TextEdit" },
+            hasEditableSelection: {
+                events.append("focus")
+                if shouldFail && stage == "focus" { throw failure }
+                return !(shouldFail && stage == "selection")
+            },
+            writeClipboard: { text in
+                events.append("clipboard")
+                if shouldFail && stage == "clipboard" { throw failure }
+                clipboard = text
+            },
+            sendPasteCommand: {
+                events.append("paste")
+                if shouldFail && stage == "paste" { throw failure }
+                field += clipboard
+            }
+        )
+        let flow = try VoiceTypingFlow(
+            recording: recording, transcription: transcription, textCorrection: correction,
+            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
+            registerShortcut: { _, _ in },
+            notifyInferenceFailure: { events.append("notify") }
+        )
+
+        // ---------------------------------------------------------
+        // No field change occurs; a paste failure may leave clipboard text.
+        // Audio must be released after the rejected or throwing request.
+        // ---------------------------------------------------------
+        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
+        if stage == "selection" {
+            XCTAssertEqual(try flow.handleShortcut(), .discarded)
+        } else {
+            XCTAssertThrowsError(try flow.handleShortcut()) { error in
+                XCTAssertTrue((error as NSError) === failure)
+            }
+        }
+        XCTAssertEqual(events, expectedEvents)
+        XCTAssertEqual(field, "Existing field")
+        XCTAssertEqual(clipboard, stage == "paste" ? "Old correction" : "Existing clipboard")
+        XCTAssertNil(capturedAudio)
+
+        // ---------------------------------------------------------
+        // Restoring delivery alone must not send pending text.
+        // Only a fresh recording can produce the next field change.
+        // ---------------------------------------------------------
+        shouldFail = false
+        events.removeAll()
+        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
+        XCTAssertEqual(events, ["start"])
+        XCTAssertEqual(field, "Existing field")
+        XCTAssertEqual(try flow.handleShortcut(), .pasted)
+        XCTAssertEqual(events, ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
+        XCTAssertEqual(captures, 2)
+        XCTAssertEqual(field, "Existing fieldFresh correction")
+        XCTAssertEqual(clipboard, "Fresh correction")
+        XCTAssertNil(capturedAudio)
+    }
+
+    @MainActor
     func test_FR006_pastesIntoSelectionChangedBeforePaste() throws -> Void {
         try checkPasteSelection(destination: "C")
     }

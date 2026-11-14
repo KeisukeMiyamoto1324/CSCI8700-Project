@@ -45,10 +45,10 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Goal:** Discard undelivered text without retry after rejected or failed delivery, and allow a new recording.
    **Spec sources:** spec Functional Requirements FR-006; architecture §3 step 5, §6; contracts ClipboardPaste and VoiceTypingFlow Methods.
    **Criteria:** None.
-   **Tests that should turn green:** None in the current suite.
+   **Tests that should turn green:** `test_FR006_discardsRejectedDeliveryWithoutRetry`, `test_FR006_discardsTextAfterFocusFailureWithoutRetry`, `test_FR006_discardsTextAfterClipboardFailureWithoutRetry`, `test_FR006_discardsTextAfterPasteFailureWithoutRetry`.
    **Depends on:** 3, 4.
    **Done when:** The listed tests pass and no previously passing test fails; verify the delivery-failure/fresh-recording probes from test_plan “Extra cases,” without assuming clipboard rollback.
-   **Status:** not started.
+   **Status:** implemented by existing request-local state and error propagation; dedicated recovery tests added. Real macOS delivery failures remain unverified.
 
 6. **Name:** Language and application context.
    **Goal:** Forward all ten supported languages and application context to local inference while preserving meaning and applying agreed style rules.
@@ -61,7 +61,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Test issues
 
-- The suite covers AC-001 coordination and Slices 2–4. Slices 5–6 still need dedicated coverage.
+- The suite covers AC-001 coordination and Slices 2–5. Slice 6 still needs dedicated coverage.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
@@ -76,7 +76,9 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 ## Coverage audit
 
 Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2; the four FR-007 tests belong only to slice 3.
+The three selection tests listed in slice 4 belong only to slice 4; the four
+delivery-discard/recovery tests listed in slice 5 belong only to slice 5.
 
 Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Real dependency composition and placeholder UI replacement remain unresolved under Design questions, outside the contracted module surface.
 
-Next action: Slice 5, Delivery failure cleanup — test rejection and delivery-stage failures followed by fresh capture.
+Next action: Slice 6, Language and application context — resolve application style rules and real-model validation scope before adding coverage.

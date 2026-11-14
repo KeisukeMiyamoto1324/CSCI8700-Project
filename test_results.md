@@ -1,5 +1,29 @@
 # Test results
 
+## Slice 5 result
+
+Added `test_FR006_discardsRejectedDeliveryWithoutRetry`,
+`test_FR006_discardsTextAfterFocusFailureWithoutRetry`,
+`test_FR006_discardsTextAfterClipboardFailureWithoutRetry`, and
+`test_FR006_discardsTextAfterPasteFailureWithoutRetry`.
+
+Each case checks unchanged field content on failure/rejection, original error
+identity where throwing, no notification or automatic retry, audio release, and
+fresh capture followed by exactly one delivery of new text. A failed paste may
+leave the clipboard written; rollback is not expected. These tests extend the
+Slice 3 paste-error boundary check with coverage of all delivery failure stages.
+
+Existing request-local state, idle transition before inference/delivery, and error
+propagation already implement the required behavior; no production change was
+necessary. Real macOS clipboard/focus/paste failures remain unverified.
+Full-suite command is the same as Slice 3 below.
+Output: `/tmp/csci8700-slice5-test-output.log`.
+
+```text
+Executed 16 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
 ## Slice 4 result
 
 Added `test_FR006_pastesIntoSelectionChangedBeforePaste`,

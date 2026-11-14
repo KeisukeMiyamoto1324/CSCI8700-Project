@@ -13,6 +13,10 @@ Lookup and delivery failures do not trigger inference notifications.
 Slice 4 verifies that selection is checked during paste, independently of the
 application context read before correction. No editable selection means no
 clipboard write or paste command.
+Slice 5 verifies rejection and focus/clipboard/paste failures: no retained pending
+text, no retry or inference notification, and fresh capture on the next shortcut.
+Errors propagate unchanged. Paste failure may leave the clipboard already written;
+no clipboard rollback is promised.
 The tables describe the full intended behavior. Real microphone, MLX, and
 macOS operations are not wired into the app yet.
 
