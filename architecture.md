@@ -11,7 +11,7 @@ These are logical modules within one application, rather than separate services.
 | Recording | Capture one audio recording (FR-001). | Microphone APIs |
 | Voice Typing Flow | Coordinate recording, processing, delivery, and cleanup (FR-001, FR-006–FR-008, AC-001). | Recording, Transcription, Text Correction, Clipboard Paste, macOS notification APIs |
 | Transcription | Detect speech and convert recorded audio into text (FR-001, FR-005, FR-008). | Local Silero VAD, MLX, and local `mlx-community/whisper-large-v3-turbo-4bit` |
-| Text Correction | Produce corrected text using application context (FR-002, FR-004, FR-005). | MLX and local `LiquidAI/LFM2.5-2.6B-MLX` |
+| Text Correction | Produce corrected text using the same rules in every application (FR-002, FR-004, FR-005). | MLX and local `LiquidAI/LFM2.5-2.6B-MLX` |
 | Clipboard Paste | Paste supplied text into the current input field when one is selected (FR-003, FR-006). | macOS clipboard, focus inspection, and keyboard event APIs |
 
 # 3. Request flow
@@ -35,7 +35,7 @@ These are logical modules within one application, rather than separate services.
 | Use one application with direct calls between logical modules. | **Preference:** a simple deployment and call structure for Acceptance Criteria, AC-001; the spec does not require a process layout. |
 | Have Voice Typing Flow order transcription, correction, and insertion. | Acceptance Criteria, AC-001 requires this processing order. |
 | Use the system clipboard and paste command, selecting the destination at paste time. | Functional Requirements, FR-003 and FR-006 define clipboard delivery and destination timing. No application-specific insertion adapter is needed. |
-| Apply wording correction and application-specific formatting in the same Text Correction module. | Functional Requirements, FR-002 and FR-004 both concern producing the final text. They do not require separate processing services. |
+| Apply the same minimal-correction rules in every application. | FR-002 and FR-004 require meaning/language preservation and application-independent correction; the destination must not affect wording or format. |
 | Treat language coverage as a condition on both local models. | Functional Requirements, FR-005 applies to both transcription and correction. Both selected models require validation. |
 
 # 5. Constraints and known limits
@@ -54,7 +54,7 @@ The request flow covers the model-ready starting condition in Acceptance Criteri
 
 Clipboard Paste uses the standard system paste action rather than writing directly to a field through an application-specific interface. It still needs a way to detect whether an editable field is selected and permission to send the paste shortcut. Focus detection and paste-command support require validation across applications.
 
-Longer recordings or a wider range of Macs would require latency and memory measurements and might require changes to audio processing. Replacing either specified model would require a spec change. Additional applications would require validation of focus detection, standard paste behavior, and writing-style rules. Broader language coverage would require rechecking both models.
+Longer recordings or a wider range of Macs would require latency and memory measurements and might require changes to audio processing. Replacing either specified model would require a spec change. Additional applications would require validation of focus detection and standard paste behavior. Broader language coverage would require rechecking both models.
 
 # 6. Out of scope
 

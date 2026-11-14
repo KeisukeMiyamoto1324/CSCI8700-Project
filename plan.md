@@ -4,8 +4,7 @@ Scope: Slices 1–6 use the five existing modules and their contracted initializ
 
 During slice 8, inject a development-only TextCorrection inference closure that
 returns its input unchanged. Keep TextCorrection in the VoiceTypingFlow path;
-do not bypass it or claim that correction is implemented. LLM correction and
-application-specific writing style remain incomplete. Success in slices 7–8
+do not bypass it or claim that correction is implemented. LLM correction remains incomplete. Success in slices 7–8
 does not complete AC-001, which requires actual text correction. The final spec,
 architecture, contracts, and existing tests remain unchanged.
 
@@ -57,13 +56,13 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Done when:** The listed tests pass and no previously passing test fails; verify the delivery-failure/fresh-recording probes from test_plan “Extra cases,” without assuming clipboard rollback.
    **Status:** implemented by existing request-local state and error propagation; dedicated recovery tests added. Real macOS delivery failures remain unverified.
 
-6. **Name:** Language and application context.
-   **Goal:** Forward all ten supported languages and application context to local inference while preserving meaning and applying agreed style rules.
+6. **Name:** Language and uniform text correction.
+   **Goal:** Support all ten languages and correct text with the same minimal-change rules in every application, preserving meaning and language.
    **Spec sources:** spec Functional Requirements FR-002, FR-004, FR-005; architecture §2, §4–§5; contracts Transcription/TextCorrection Methods and Shared types.
    **Criteria:** None; FR-004–FR-005 have no acceptance criteria.
    **Tests that should turn green:** None in the current suite.
    **Depends on:** 1, 5.
-   **Done when:** The listed tests pass and no previously passing test fails; verify the ten-language and meaning/context probes from test_plan “Extra cases,” after resolving style/model questions below.
+   **Done when:** The listed tests pass and no previously passing test fails; verify the ten-language, meaning preservation, and application-independence probes from test_plan “Extra cases,” after resolving remaining model integration questions below.
    **Status:** not started.
 
 7. **Name:** Minimal real-device transcription.
@@ -92,7 +91,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 - Slices 7–8 need real microphone/model/OS validation; injected-closure tests do not demonstrate working speech recognition, in-app results, global shortcuts, or external field insertion. Their DEV checks are planned manual checks, not implemented XCTest methods or passing results.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
-- Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
+- Exact generated wording is not fixed. Verify minimal correction, preserved meaning/language, and that application identifiers do not affect the correction prompt or rules.
 
 ## Selected speech model
 
@@ -126,7 +125,7 @@ or contracted signature is required.
 - Before slice 8: decide Control double-tap timing and event handling, real editable-focus inspection and paste support, notification wiring, and UI behavior during capture/inference. Define setup permissions and a repeatable way to exercise inference and delivery failures without changing the final contracts.
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
 - Which correction prompt should be used for the selected 4-bit LFM model, and how should Swift invoke it? Both model choices and precisions, and Silero VAD selection, are fixed above; inference integration, correction-quality validation, and VAD runtime/settings remain pending. Model files are prepared during setup.
-- Which applications and formatting/style rules must TextCorrection support? Application context is already sampled immediately before correction; destination focus is checked at paste time.
+- FR-004 uses identical correction rules for all applications, including unknown identifiers and nil. Keep the existing application-identifier argument for compatibility, but do not use it in the correction prompt. Destination focus is still checked at paste time.
 - What cleanup is expected after capture or application-lookup failures beyond the contracted throw/discard behavior?
 
 ## Coverage audit
@@ -135,6 +134,6 @@ Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and
 The three selection tests listed in slice 4 belong only to slice 4; the four
 delivery-discard/recovery tests listed in slice 5 belong only to slice 5.
 
-Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; slice 8 plans global shortcut, external clipboard delivery, and notification wiring. DEV-7 checks belong only to slice 7; DEV-8 checks belong only to slice 8. Real LLM correction and application-style integration remain unfinished; the temporary identity closure does not fulfill TextCorrection's final behavior.
+Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; slice 8 plans global shortcut, external clipboard delivery, and notification wiring. DEV-7 checks belong only to slice 7; DEV-8 checks belong only to slice 8. Real LLM correction integration remains unfinished; the temporary identity closure does not fulfill TextCorrection's final behavior.
 
 Next action: Slice 7, Minimal real-device transcription — decide the Swift-to-MLX integration approach before implementation; slice 6 remains pending.

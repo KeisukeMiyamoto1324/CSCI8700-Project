@@ -17,7 +17,7 @@ These are additional probes, not acceptance criteria.
 | ID | Requirement | Cases (request/call; expected status; expected body fields; expected side effects) | Inside/outside | Control |
 |---|---|---|---|---|
 | extra—boundaries / input types | FR-005 | Repeat AC-001 with English “Thank you,” Arabic “شكراً,” Chinese “谢谢,” French “Merci,” German “Danke,” Italian “Grazie,” Japanese “ありがとうございます,” Korean “감사합니다,” Portuguese “Obrigado,” and Spanish “Gracias.” **Status:** delivered. **Body:** thanks in the original language. **Side effects:** local processing and paste into A. | Inside: all 10 languages. Outside: Russian “Спасибо”; no outcome is specified, so no rejection is assumed. No duration or size limits are defined. | No specified rejection. |
-| extra—meaning / context / returned text | FR-002, FR-004 | Record “Please schedule the meeting for Tuesday, not Thursday” in two applications. **Status:** delivered. **Body:** Tuesday remains the requested day; Thursday is not selected. **Side effects:** corrected text enters the selected field with suitable style. Exact application-specific styles remain unspecified. | No application coverage or style limits are defined. | No rejection required. |
+| extra—meaning / application independence / returned text | FR-002, FR-004 | Supply identical transcription and language with two different application identifiers, an unknown identifier, and nil. **Status:** delivered. **Body:** meaning and language are preserved; Tuesday remains the requested day and Thursday is not selected. **Side effects:** identical correction rules and prompt are used in every case; the destination does not change wording or format. | Use the same input, model state, and generation settings when comparing output; do not attribute sampling differences to application rules. | Change only the application identifier; correction behavior remains independent of it. |
 | extra—identity / time | FR-006 | Start in A, select B before stopping, then select C before paste. **Status:** delivered. **Body:** corrected sentence in C. **Side effects:** A and B unchanged. | Select B just before stopping and C just after stopping, before paste; C is the destination. No numeric timing threshold is specified. | Keep B selected through paste; B receives the text. |
 | extra—state | FR-003, FR-006 | Stop with no editable field selected. **Status:** discarded. **Body:** no inserted text. **Side effects:** no clipboard write or paste command; no recording or text result retained for retry. Selecting A and double-tapping Control starts a new recording rather than delivering old text. Separately, make the paste command fail with a field selected: delivery throws and undelivered text is discarded without retry. | Editable selection present/absent; paste command succeeds/fails. A failed paste may already have written the clipboard. | For each case, change only selection availability or paste-command success; delivery succeeds with the same text. For failure, verify no new field content or retained result is created; do not assume clipboard rollback. |
 | extra—errors | FR-007 | Separately make transcription inference fail and correction inference fail during the baseline flow. **Status:** failure is reported by throwing. **Body:** no inserted text; no specified error code. **Side effects:** macOS notification; recording and intermediate text discarded; no clipboard write, paste, retained result, or new field content. | Each run has exactly one failing inference stage. | Adjacent successful run changes only the failing inference dependency to success; the baseline text is delivered. |
@@ -59,11 +59,11 @@ prompt before real-model validation.
 Prepare model files during setup and verify runtime correction sends no audio
 or text to external servers.
 
-Run AC-001 and the ten-language, meaning/context, and inference-failure probes
+Run AC-001 and the ten-language, meaning/application-independence, and inference-failure probes
 with the actual correction model. Verify spelling/wording correction, preserved
-meaning and language, agreed application style, and notification/discard on
+meaning and language, application-independent correction, and notification/discard on
 correction failure. Exact generated wording is not fixed. Model selection alone
-does not establish that all ten required languages or style rules are supported.
+does not establish ten-language support or correction quality. Verify unchanged correction prompts across application identifiers, including unknown identifiers and nil.
 These checks are planned, not executed; current fixed-result tests do not load
 the LLM. Development-stage slices 7–8 below continue to defer LLM integration.
 
@@ -73,8 +73,7 @@ These checks cover slices 7–8, not final product acceptance. Slice 7 uses app
 buttons and shows the transcript. Slice 8 uses the existing VoiceTypingFlow and
 TextCorrection module with a development-only inference closure that returns
 the input unchanged, then delivers through real ClipboardPaste dependencies.
-No LLM is loaded; spelling/wording correction and application-style adjustment
-remain incomplete. Keep AC-001 and all existing tests unchanged; passing these
+No LLM is loaded; spelling/wording correction remains incomplete. Keep AC-001 and all existing tests unchanged; passing these
 checks does not establish AC-001 or ten-language support.
 
 Prepare model files and required permissions during setup. Use English initially
@@ -99,13 +98,13 @@ Record setup, observed outcomes, and whether a failure was injected
 or arose from an actual OS operation. These checks are not new XCTest method names.
 They are planned and unexecuted; failure-injection mechanics and inference/OS
 integration details must be settled before implementation. Final correction,
-style, and ten-language checks above remain required for the complete application.
+application-independence, and ten-language checks above remain required for the complete application.
 
 ## Spec gaps
 
 | Gap | Unresolved detail |
 |---|---|
 | Requirements with no acceptance criterion | FR-004–FR-008. AC-001 does not explicitly test unnatural wording or meaning preservation. |
-| Unspecified test values | Application-specific style rules and exact model output are not specified; exact style assertions cannot be derived. |
+| Unspecified test values | Exact generated wording is not fixed; check minimal corrections and preserved meaning/language. Application identifiers must not change correction rules or prompts. |
 
 Missing AC/NFR references are excluded from this review. No requirements are inferred from unsupported languages or absent listing features.
