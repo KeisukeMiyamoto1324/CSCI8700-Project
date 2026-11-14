@@ -64,6 +64,13 @@ final class VoiceTypingFlow {
         let text = try transcription.transcribe(audio: audio, language: language)
 
         // ---------------------------------------------------------
+        // Discard blank input without changing nonempty transcription.
+        // ---------------------------------------------------------
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .discarded
+        }
+
+        // ---------------------------------------------------------
         // Read application context immediately before correction.
         // Keep intermediate results local to this request.
         // ---------------------------------------------------------
