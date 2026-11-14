@@ -29,8 +29,8 @@ Local AI Voice Typing Assistant is macOS software that turns speech into natural
 - **FR-001:** As an administrative office assistant, I want to start and stop voice recording by double-tapping the Control key and have my speech transcribed locally, so that I can create work documents efficiently while protecting confidential information.
 - **FR-002:** As an administrative office assistant, I want the system to correct spelling errors and unnatural wording in my transcribed text locally, so that I can enter natural, accurate text that preserves my intended meaning.
 - **FR-003:** As an administrative office assistant, I want the corrected text to be entered into the selected text field using the system clipboard and paste command, so that I can enter polished text into the active application without manually copying and pasting it.
-- **FR-004:** As a user, I want the system to adjust the text's format and writing style based on the application I am using, so that the text fits that application.
-- **FR-005:** The system shall support voice input and text correction in English, Arabic, Chinese, French, German, Italian, Japanese, Korean, Portuguese, and Spanish.
+- **FR-004:** The system shall use the same text-correction rules in every application. The destination application shall not change the corrected wording or format. Correction shall preserve the original language and intended meaning, fix spelling, grammar, and unnatural wording with minimal changes, and add no new information.
+- **FR-005:** The system shall support voice input and text correction in English, Arabic, Chinese, French, German, Italian, Japanese, Korean, Portuguese, and Spanish. Transcription shall detect the language automatically and pass it to text correction. Speech detected in another language shall be discarded without correction or paste, with an unsupported-language status shown in the app.
 - **FR-006:** The system shall insert the corrected text into the text field selected at paste time. If no editable field is selected or delivery fails, the system shall discard the undelivered text without retrying.
 - **FR-007:** If transcription or text correction inference fails, the system shall display a macOS notification and discard the recording and all intermediate text.
 - **FR-008:** For silent or otherwise non-speech audio, the system shall end recording without inserting text or taking further action.
@@ -58,7 +58,24 @@ Speech recognition shall use the 4-bit quantized MLX model
 [`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
 (Whisper Large v3 Turbo), running locally on Apple Silicon. Model files are
 prepared during initial setup; runtime transcription shall not send audio or
-text to external servers. The text-correction LLM is not yet specified.
+text to external servers.
+
+Text correction shall use
+[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
+locally through MLX using its `4bit/` variant (4-bit quantization). Model
+files are prepared during initial setup; runtime correction shall not send audio
+or text to external servers.
+
+Speech/non-speech detection shall use [Silero VAD](https://github.com/snakers4/silero-vad)
+locally. When no speech is detected, Transcription shall return an empty string
+without running Whisper inference, following FR-008.
+
+The Control double-tap interval is 0.3 seconds, with no intervening keys or
+other modifiers. New recording actions during inference are ignored.
+Initial setup in the app downloads the required model/tokenizer files and obtains
+permissions. After setup, runtime recording and inference use local assets only.
+LFM correction runs at temperature 0 with a 4096-token output limit; empty or
+incomplete output is an inference failure and shall not be pasted.
 
 # Scope
 
