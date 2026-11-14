@@ -27,10 +27,10 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Goal:** Notify once and discard recording and intermediate text when either inference stage throws, then propagate the failure.
    **Spec sources:** spec Functional Requirements FR-007; architecture §3 step 6; contracts VoiceTypingFlow Methods.
    **Criteria:** None; FR-007 has no acceptance criterion.
-   **Tests that should turn green:** None in the current suite.
+   **Tests that should turn green:** `test_FR007_notifiesOnTranscriptionFailureAndRecovers`, `test_FR007_notifiesOnCorrectionFailureAndRecovers`. Boundary controls: `test_FR007_doesNotNotifyOnApplicationLookupFailure`, `test_FR007_doesNotNotifyOnPasteFailure`.
    **Depends on:** 1, 2.
    **Done when:** The listed tests pass and no previously passing test fails; verify both inference-failure probes and a fresh successful run from test_plan “Extra cases.”
-   **Status:** not started.
+   **Status:** implemented; automated results recorded in test_results.md. Actual macOS notification delivery remains unverified.
 
 4. **Name:** Paste-time selection.
    **Goal:** Deliver to the field selected at paste time and skip clipboard writing and paste when no editable field exists.
@@ -61,7 +61,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Test issues
 
-- The suite covers AC-001 coordination and Slice 2 blank-transcription behavior. Slices 3–6 have no existing tests to turn green; their completion cannot be established by this suite alone.
+- The suite covers AC-001 coordination, Slice 2 blank-transcription behavior, and Slice 3 inference-failure handling and recovery. Slices 4–6 still need dedicated coverage.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
@@ -75,8 +75,8 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Coverage audit
 
-Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2.
+Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2; the four FR-007 tests belong only to slice 3.
 
 Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Real dependency composition and placeholder UI replacement remain unresolved under Design questions, outside the contracted module surface.
 
-Next action: Slice 3, Inference failure cleanup — add separate tests for transcription and correction failures.
+Next action: Slice 4, Paste-time selection — add tests for changed focus and no editable selection.

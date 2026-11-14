@@ -6,8 +6,11 @@ Slice 1 implements dependency forwarding, shortcut registration, and the success
 recording-to-paste flow. Application context is read immediately before correction.
 Slice 2 discards transcription that is empty after trimming `.whitespacesAndNewlines`,
 without application lookup, correction, delivery, or notification. Nonempty text
-is forwarded unchanged. The tables describe the full intended behavior;
-inference-failure notification remains for a later slice. Real microphone, MLX, and
+is forwarded unchanged. Slice 3 invokes the injected notification once when
+transcription or correction throws, then rethrows the original error. Intermediate
+audio and text remain local to the call; the next shortcut starts fresh capture.
+Lookup and delivery failures do not trigger inference notifications.
+The tables describe the full intended behavior. Real microphone, MLX, and
 macOS operations are not wired into the app yet.
 
 ## Methods

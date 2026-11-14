@@ -1,5 +1,37 @@
 # Test results
 
+## Slice 3 result (2026-11-13)
+
+Added four FR-007 tests; existing tests were unchanged. Before implementation,
+the transcription and correction failure tests failed because notification was
+missing. The other seven tests passed. Output: `/tmp/csci8700-slice3-red.log`.
+
+Full suite command:
+
+```sh
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-plan-build
+```
+
+After implementation:
+
+```text
+test_FR007_notifiesOnTranscriptionFailureAndRecovers passed
+test_FR007_notifiesOnCorrectionFailureAndRecovers passed
+test_FR007_doesNotNotifyOnApplicationLookupFailure passed
+test_FR007_doesNotNotifyOnPasteFailure passed
+Executed 9 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+Both inference-failure cases verify exactly one notification, original error
+identity, no delivery or clipboard changes, audio release after the call, and a
+fresh successful recording without old-text retry. Lookup and paste failures
+verify no inference notification; paste failure does not assume clipboard rollback.
+The injected notification callback is tested, not actual macOS notification delivery.
+Full output: `/tmp/csci8700-slice3-test-output.log`.
+
 ## Slice 2 result (2026-11-13)
 
 Added four FR-008 tests without changing `test_AC001`. Before implementation,
