@@ -72,7 +72,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Criteria:** None completed; AC-001 remains assigned to slice 1 and still requires full real-device validation.
    **Tests that should turn green:** None in the current suite; planned real-device checks DEV-7-01 and DEV-7-02 are defined in test_plan.md. Integration tests must be defined after the inference integration approach is decided.
    **Depends on:** 1. Can be implemented before slice 6; initial demo uses English and does not establish ten-language support.
-   **Done when:** With microphone permission and model files prepared during setup, the user can start/stop actual recording using app buttons, see the recorded speech transcribed through local `mlx-community/whisper-large-v3-turbo-4bit`, and repeat with a fresh recording. Runtime sends no audio or text to external servers. Verify this on the Mac, record the model revision and results, and keep all existing tests passing.
+   **Done when:** With microphone permission and model files prepared during setup, the user can start/stop actual recording using app buttons, see the recorded speech transcribed through local `mlx-community/whisper-large-v3-turbo-4bit`, and repeat with a fresh recording. Runtime sends no audio or text to external servers. Verify this on the Mac, record the results, and keep all existing tests passing.
    **Status:** not started.
    Includes microphone setup instructions, real capture, local model loading, audio conversion/transfer, and result display. Control double-tap handling and delivery into other apps follow in slice 8; LLM correction remains deferred. The inference library, Swift integration, UI composition, and handling of slow inference must be decided under Design questions before implementation, within the existing architecture and contracts.
 
@@ -82,7 +82,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Criteria:** None completed; AC-001 remains assigned to slice 1 and requires actual LLM correction and full real-device validation.
    **Tests that should turn green:** None in the current suite establishes real OS integration; planned real-device checks DEV-8-01–DEV-8-07 are defined in test_plan.md. All existing 16 tests must remain passing.
    **Depends on:** 1–5, 7. Can be implemented before slice 6; initial demo uses English.
-   **Done when:** With model files and microphone, focus/paste, shortcut, and notification permissions prepared during setup, real Control double-taps drive VoiceTypingFlow from capture through transcription and clipboard paste. The development-only TextCorrection closure returns input unchanged. The destination is checked at paste time; absent selection, silent input, and failures follow existing discard/no-retry rules. Transcription failure triggers a real macOS notification. DEV-8-01–DEV-8-07 are verified on the Mac, model revision and outcomes are recorded, and all existing tests pass without regression. No runtime audio or text leaves the Mac.
+   **Done when:** With model files and microphone, focus/paste, shortcut, and notification permissions prepared during setup, real Control double-taps drive VoiceTypingFlow from capture through transcription and clipboard paste. The development-only TextCorrection closure returns input unchanged. The destination is checked at paste time; absent selection, silent input, and failures follow existing discard/no-retry rules. Transcription failure triggers a real macOS notification. DEV-8-01–DEV-8-07 are verified on the Mac, outcomes are recorded, and all existing tests pass without regression. No runtime audio or text leaves the Mac.
    **Status:** not started.
    Wire existing injected dependencies for shortcut registration, active application lookup, editable focus inspection, clipboard writing, paste command, and inference-failure notification. Do not add a new processing route around VoiceTypingFlow or alter contracted signatures. The app must identify this development stage as having no LLM correction; retain no pending text for retry. UI behavior during capture/inference, shortcut timing, and OS dependency composition must be resolved before implementation.
 
@@ -107,17 +107,25 @@ checks.
 
 Text-correction model selection is resolved by spec Technical Constraints:
 [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX).
-Use the repository's `4bit/` variant. Revision, prompt, and Swift inference
+Use the repository's `4bit/` variant. Prompt and Swift inference
 integration remain undecided. Runtime integration and quality
 validation are not implemented. Selection does not change slices 7–8: they still
 defer real LLM correction and slice 8 uses a development-only identity closure.
+
+## Selected speech detector
+
+Use local [Silero VAD](https://github.com/snakers4/silero-vad) within the existing
+Transcription inference dependency before Whisper. Return an empty string when
+no speech is detected, without invoking Whisper. VAD runtime integration and
+detection settings remain to be decided and validated in slice 7; no new module
+or contracted signature is required.
 
 ## Design questions
 
 - Before slice 7: how should Swift call the selected model, which inference library should load it, and what audio format/transfer mechanism should connect Recording to Transcription? Decide where the existing app UI composes these dependencies and how inference avoids blocking UI updates while preserving existing contracts.
 - Before slice 8: decide Control double-tap timing and event handling, real editable-focus inspection and paste support, notification wiring, and UI behavior during capture/inference. Define setup permissions and a repeatable way to exercise inference and delivery failures without changing the final contracts.
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
-- Which revision and correction prompt should be used for the selected 4-bit LFM model, and how should Swift invoke it? Both model choices and precisions are fixed above; inference integration, correction-quality validation, and silence-detection behavior remain pending. Model files are prepared during setup.
+- Which correction prompt should be used for the selected 4-bit LFM model, and how should Swift invoke it? Both model choices and precisions, and Silero VAD selection, are fixed above; inference integration, correction-quality validation, and VAD runtime/settings remain pending. Model files are prepared during setup.
 - Which applications and formatting/style rules must TextCorrection support? Application context is already sampled immediately before correction; destination focus is checked at paste time.
 - What cleanup is expected after capture or application-lookup failures beyond the contracted throw/discard behavior?
 

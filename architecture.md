@@ -10,14 +10,14 @@ These are logical modules within one application, rather than separate services.
 |---|---|---|
 | Recording | Capture one audio recording (FR-001). | Microphone APIs |
 | Voice Typing Flow | Coordinate recording, processing, delivery, and cleanup (FR-001, FR-006–FR-008, AC-001). | Recording, Transcription, Text Correction, Clipboard Paste, macOS notification APIs |
-| Transcription | Convert recorded audio into text (FR-001, FR-005). | MLX and local `mlx-community/whisper-large-v3-turbo-4bit` |
+| Transcription | Detect speech and convert recorded audio into text (FR-001, FR-005, FR-008). | Local Silero VAD, MLX, and local `mlx-community/whisper-large-v3-turbo-4bit` |
 | Text Correction | Produce corrected text using application context (FR-002, FR-004, FR-005). | MLX and local `LiquidAI/LFM2.5-2.6B-MLX` |
 | Clipboard Paste | Paste supplied text into the current input field when one is selected (FR-003, FR-006). | macOS clipboard, focus inspection, and keyboard event APIs |
 
 # 3. Request flow
 
 1. With local models ready, the user double-taps the Control key. Voice Typing Flow starts Recording.
-2. The user speaks and double-taps the Control key again. Voice Typing Flow stops Recording and passes the completed audio to Transcription. Silent or non-speech audio ends the flow without insertion or further action.
+2. The user speaks and double-taps the Control key again. Voice Typing Flow stops Recording and passes the completed audio to Transcription. Transcription checks speech locally with Silero VAD. If no speech is detected, it returns an empty string without Whisper inference, ending the flow without insertion or further action.
 3. Transcription returns text through local MLX inference. Voice Typing Flow passes the text to Text Correction, which returns the corrected text through the local LLM.
 4. Clipboard Paste checks whether an editable text field is selected at paste time. If selected, it writes the corrected text to the system clipboard and sends the system paste command. Otherwise, it sends no paste command.
 5. Undelivered text is discarded; there is no pending-text state or retry.
@@ -28,6 +28,7 @@ These are logical modules within one application, rather than separate services.
 | Decision | Reason |
 |---|---|
 | Use macOS, Apple Silicon, and MLX for local inference. | Fixed by Description. |
+| Use local [Silero VAD](https://github.com/snakers4/silero-vad) within Transcription to detect speech before Whisper inference. | Fixed by spec Technical Constraints and FR-008; no new module or public interface is needed. |
 | Use the 4-bit quantized MLX Whisper Large v3 Turbo model, [`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit), for transcription. | Fixed by spec Technical Constraints; model files are prepared during initial setup. |
 | Use the `4bit/` variant of [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX) locally for text correction. | Fixed by spec Technical Constraints; integration remains pending. |
 | Keep both inference stages within the local application, with no external inference API calls. | Description requires local audio and text processing. |
@@ -42,8 +43,9 @@ These are logical modules within one application, rather than separate services.
 The fixed platform constraints are macOS, Apple Silicon, and MLX (Description).
 Technical Constraints fixes the speech model to `mlx-community/whisper-large-v3-turbo-4bit`
 (Whisper Large v3 Turbo, 4-bit quantization) and the text-correction model to
-`LiquidAI/LFM2.5-2.6B-MLX`, using its `4bit/` variant. The correction model's
-revision remains undecided. The spec does not fix an
+`LiquidAI/LFM2.5-2.6B-MLX`, using its `4bit/` variant. Local speech detection uses
+Silero VAD. Its runtime integration and detection settings remain undecided.
+The spec does not fix an
 implementation language. Model selection does not
 establish integration or accuracy: ten-language coverage and silence/non-speech
 handling still require real-model validation.

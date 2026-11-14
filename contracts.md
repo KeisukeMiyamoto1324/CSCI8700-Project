@@ -26,6 +26,9 @@ The production `Transcription.localInference` dependency shall run
 [`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
 locally through MLX (Whisper Large v3 Turbo, 4-bit quantization), as required by
 spec Technical Constraints. Model files are prepared during initial setup.
+This dependency shall first check speech locally with Silero VAD and return an
+empty string without Whisper inference when no speech is detected. VAD remains
+inside the existing Transcription dependency; signatures are unchanged.
 Injected test closures may supply fixed results; they do not validate model use,
 accuracy, or silence detection. Existing signatures are unchanged, and the
 production model dependency is not connected yet.
@@ -33,7 +36,7 @@ production model dependency is not connected yet.
 The production `TextCorrection.localInference` dependency shall use
 [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
 locally through MLX, with the existing text, language, and application-context
-arguments, using the repository's `4bit/` variant. Revision, prompt, and inference
+arguments, using the repository's `4bit/` variant. Prompt and inference
 integration remain undecided.
 Model selection does not change any signature or complete model integration.
 Injected test closures do not establish correction quality or language coverage.

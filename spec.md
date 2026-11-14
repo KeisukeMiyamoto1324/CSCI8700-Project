@@ -62,10 +62,13 @@ text to external servers.
 
 Text correction shall use
 [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
-locally through MLX using its `4bit/` variant (4-bit quantization). The model
-revision remains to be selected before integration. Model
+locally through MLX using its `4bit/` variant (4-bit quantization). Model
 files are prepared during initial setup; runtime correction shall not send audio
 or text to external servers.
+
+Speech/non-speech detection shall use [Silero VAD](https://github.com/snakers4/silero-vad)
+locally. When no speech is detected, Transcription shall return an empty string
+without running Whisper inference, following FR-008.
 
 # Scope
 

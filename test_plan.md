@@ -32,7 +32,7 @@ Production speech recognition uses
 (MLX Whisper Large v3 Turbo, 4-bit quantization; spec Technical Constraints).
 After model files and permissions are prepared during setup, verify that runtime
 loads this model locally and performs transcription without sending audio or
-text to external servers. Record the resolved model revision with validation results.
+text to external servers. Record validation results.
 
 Run AC-001 and the ten-language and silence/non-speech probes above with actual
 recordings and the selected speech model. Verify that supported-language speech
@@ -43,15 +43,18 @@ described below.
 
 These are planned integration checks, not passing test results. The current
 injected-closure tests do not load the model or establish speech-recognition quality.
-The inference library, Swift integration, and silence-detection details remain
-to be decided; no thresholds or quality scores are specified here.
+Speech detection uses local [Silero VAD](https://github.com/snakers4/silero-vad)
+inside Transcription. Verify silence/non-speech returns an empty string without
+Whisper inference, while speech proceeds to Whisper. The inference library,
+Swift integration, VAD runtime, and detection settings remain to be decided;
+no thresholds or quality scores are specified here.
 
 ## Selected correction model validation
 
 Production text correction uses
 [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
 locally through MLX using its `4bit/` variant (spec Technical Constraints).
-Verify the selected precision and record the resolved revision and correction
+Verify the selected precision and record the correction
 prompt before real-model validation.
 Prepare model files during setup and verify runtime correction sends no audio
 or text to external servers.
@@ -82,17 +85,17 @@ content as well as flow results; `.pasted` alone only confirms command completio
 
 | ID | Slice | Procedure and expected result | Status |
 |---|---|---|---|
-| DEV-7-01 | 7 | Start/stop real microphone capture using app buttons. Verify the specified local model transcribes the recording and the result appears in the app. Record the model revision and check that runtime sends no audio or text to external servers. | not run |
+| DEV-7-01 | 7 | Start/stop real microphone capture using app buttons. Verify the specified local model transcribes the recording and the result appears in the app. Check that runtime sends no audio or text to external servers. | not run |
 | DEV-7-02 | 7 | Record two different sentences in succession. Each run displays its own transcription, without reusing earlier audio/text, and the UI remains usable during inference. | not run |
 | DEV-8-01 | 8 | With an editable field selected, double-tap Control to start capture, speak, and double-tap again to stop. Verify automatic clipboard/paste delivery. Inspect the development TextCorrection input/output and confirm exact equality; inserted text matches the transcription without LLM changes. | not run |
 | DEV-8-02 | 8 | Start in field A, select B before stopping, then C before paste. Verify only C receives the transcription. Repeat keeping B selected; only B receives it. | not run |
 | DEV-8-03 | 8 | Finish with no editable field selected. Verify discard, unchanged clipboard, and no paste command. Select a field and invoke the shortcut: fresh capture starts, and no previous text is delivered. | not run |
-| DEV-8-04 | 8 | Record silence and non-speech separately. Verify an empty/blank transcription is discarded with no TextCorrection, clipboard, paste, or notification call. Repeat with speech as a successful control. | not run |
+| DEV-8-04 | 8 | Record silence and non-speech separately. Verify Silero VAD detects no speech, Whisper is not invoked, and an empty transcription is discarded with no TextCorrection, clipboard, paste, or notification call. Repeat with speech as a successful control. | not run |
 | DEV-8-05 | 8 | Make transcription inference fail in a controlled run. Verify exactly one actual macOS notification, propagated failure, no clipboard/field change, and discarded audio/intermediate text. Restore inference and verify a fresh recording succeeds without retrying old text. | not run |
 | DEV-8-06 | 8 | Exercise focus inspection, clipboard write, and paste-command failures separately through the delivery dependency boundary. Verify original failure propagation, no inference notification, no automatic retry, and fresh capture afterward. A failed paste may already have written the clipboard; do not require rollback or delivery confirmation from the destination. | not run |
 | DEV-8-07 | 8 | Run the existing automated suite: all 16 tests must pass, including the original correction-path AC-001 test. Keep development identity correction out of the existing test configuration. | not run |
 
-Record setup, model revision, observed outcomes, and whether a failure was injected
+Record setup, observed outcomes, and whether a failure was injected
 or arose from an actual OS operation. These checks are not new XCTest method names.
 They are planned and unexecuted; failure-injection mechanics and inference/OS
 integration details must be settled before implementation. Final correction,
