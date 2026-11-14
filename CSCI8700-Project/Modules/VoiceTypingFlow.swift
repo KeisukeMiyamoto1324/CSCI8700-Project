@@ -23,6 +23,7 @@ final class VoiceTypingFlow {
     private let textCorrection: any TextCorrectionContract
     private let clipboardPaste: any ClipboardPasteContract
     private let language: Language
+    private let notifyInferenceFailure: () -> Void
     private var isRecording = false
 
     init(
@@ -40,6 +41,7 @@ final class VoiceTypingFlow {
         self.textCorrection = textCorrection
         self.clipboardPaste = clipboardPaste
         self.language = language
+        self.notifyInferenceFailure = notifyInferenceFailure
 
         // ---------------------------------------------------------
         // Register without retaining the flow through the handler.
@@ -61,7 +63,17 @@ final class VoiceTypingFlow {
 
         let audio = try recording.stop()
         isRecording = false
-        let text = try transcription.transcribe(audio: audio, language: language)
+        // ---------------------------------------------------------
+        // Notify only for transcription inference errors, then rethrow.
+        // Request-local audio and text are released when the call exits.
+        // ---------------------------------------------------------
+        let text: String
+        do {
+            text = try transcription.transcribe(audio: audio, language: language)
+        } catch {
+            notifyInferenceFailure()
+            throw error
+        }
 
         // ---------------------------------------------------------
         // Discard blank input without changing nonempty transcription.
@@ -75,11 +87,20 @@ final class VoiceTypingFlow {
         // Keep intermediate results local to this request.
         // ---------------------------------------------------------
         let application = try clipboardPaste.currentApplicationBundleIdentifier()
-        let correctedText = try textCorrection.correct(
-            text: text,
-            language: language,
-            applicationBundleIdentifier: application
-        )
+        // ---------------------------------------------------------
+        // Keep lookup and delivery errors outside inference handling.
+        // ---------------------------------------------------------
+        let correctedText: String
+        do {
+            correctedText = try textCorrection.correct(
+                text: text,
+                language: language,
+                applicationBundleIdentifier: application
+            )
+        } catch {
+            notifyInferenceFailure()
+            throw error
+        }
         let pasted = try clipboardPaste.paste(text: correctedText)
         return pasted ? .pasted : .discarded
     }
