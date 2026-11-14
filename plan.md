@@ -1,6 +1,13 @@
 # Implementation plan
 
-Scope: Slices 1–6 use the five existing modules and their contracted initializers/methods. Slice 7 adds a minimal real-device transcription demo using Recording, Transcription, and the existing app UI; integration design decisions must be resolved before implementation. This is a desktop app.
+Scope: Slices 1–6 use the five existing modules and their contracted initializers/methods. Slice 7 connects real recording and transcription to the app UI. Slice 8 connects the existing VoiceTypingFlow to real shortcuts and clipboard delivery. These are development steps toward the unchanged final architecture and contracts; integration design decisions must be resolved before implementation. This is a desktop app.
+
+During slice 8, inject a development-only TextCorrection inference closure that
+returns its input unchanged. Keep TextCorrection in the VoiceTypingFlow path;
+do not bypass it or claim that correction is implemented. LLM correction and
+application-specific writing style remain incomplete. Success in slices 7–8
+does not complete AC-001, which requires actual text correction. The final spec,
+architecture, contracts, and existing tests remain unchanged.
 
 Source references: architecture §1–§6; contracts “Methods,” “Initializers and injected dependencies,” and “Shared types.” `spec.md` has no numbered sections, so references below use its headings and FR IDs rather than inventing section numbers.
 
@@ -63,16 +70,26 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Goal:** Record speech on the Mac, transcribe it locally with the specified Whisper model, and display the transcription in the app.
    **Spec sources:** spec Description, Functional Requirements FR-001 (recording/transcription portion), Technical Constraints, and Scope; architecture §2–§5; contracts Recording and Transcription Methods and Initializers. Start/stop buttons and in-app result display are the agreed demo scope, not completion of the Control double-tap requirement.
    **Criteria:** None completed; AC-001 remains assigned to slice 1 and still requires full real-device validation.
-   **Tests that should turn green:** None in the current suite; integration tests must be defined after the inference integration approach is decided.
+   **Tests that should turn green:** None in the current suite; planned real-device checks DEV-7-01 and DEV-7-02 are defined in test_plan.md. Integration tests must be defined after the inference integration approach is decided.
    **Depends on:** 1. Can be implemented before slice 6; initial demo uses English and does not establish ten-language support.
    **Done when:** With microphone permission and model files prepared during setup, the user can start/stop actual recording using app buttons, see the recorded speech transcribed through local `mlx-community/whisper-large-v3-turbo-4bit`, and repeat with a fresh recording. Runtime sends no audio or text to external servers. Verify this on the Mac, record the model revision and results, and keep all existing tests passing.
    **Status:** not started.
-   Includes microphone setup instructions, real capture, local model loading, audio conversion/transfer, and result display. Text correction, Control double-tap handling, and delivery into other apps require later integration work. The inference library, Swift integration, UI composition, and handling of slow inference must be decided under Design questions before adding new functions or changing contracts.
+   Includes microphone setup instructions, real capture, local model loading, audio conversion/transfer, and result display. Control double-tap handling and delivery into other apps follow in slice 8; LLM correction remains deferred. The inference library, Swift integration, UI composition, and handling of slow inference must be decided under Design questions before implementation, within the existing architecture and contracts.
+
+8. **Name:** Real transcription delivery.
+   **Goal:** Start and stop recording with Control double-taps, transcribe locally, and paste the unchanged transcription into the selected field using real macOS operations.
+   **Spec sources:** spec Description, Functional Requirements FR-001, FR-003, FR-006–FR-008, Technical Constraints, and Scope; architecture §2–§5; contracts Methods and Initializers. This development step defers FR-002/FR-004 correction and does not establish FR-005 ten-language coverage.
+   **Criteria:** None completed; AC-001 remains assigned to slice 1 and requires actual LLM correction and full real-device validation.
+   **Tests that should turn green:** None in the current suite establishes real OS integration; planned real-device checks DEV-8-01–DEV-8-07 are defined in test_plan.md. All existing 16 tests must remain passing.
+   **Depends on:** 1–5, 7. Can be implemented before slice 6; initial demo uses English.
+   **Done when:** With model files and microphone, focus/paste, shortcut, and notification permissions prepared during setup, real Control double-taps drive VoiceTypingFlow from capture through transcription and clipboard paste. The development-only TextCorrection closure returns input unchanged. The destination is checked at paste time; absent selection, silent input, and failures follow existing discard/no-retry rules. Transcription failure triggers a real macOS notification. DEV-8-01–DEV-8-07 are verified on the Mac, model revision and outcomes are recorded, and all existing tests pass without regression. No runtime audio or text leaves the Mac.
+   **Status:** not started.
+   Wire existing injected dependencies for shortcut registration, active application lookup, editable focus inspection, clipboard writing, paste command, and inference-failure notification. Do not add a new processing route around VoiceTypingFlow or alter contracted signatures. The app must identify this development stage as having no LLM correction; retain no pending text for retry. UI behavior during capture/inference, shortcut timing, and OS dependency composition must be resolved before implementation.
 
 ## Test issues
 
 - The suite covers AC-001 coordination and Slices 2–5. Slice 6 still needs dedicated coverage.
-- Slice 7 needs real microphone/model validation; injected-closure tests do not demonstrate working speech recognition or in-app results.
+- Slices 7–8 need real microphone/model/OS validation; injected-closure tests do not demonstrate working speech recognition, in-app results, global shortcuts, or external field insertion. Their DEV checks are planned manual checks, not implemented XCTest methods or passing results.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
@@ -88,7 +105,8 @@ checks. Text-correction LLM selection remains open.
 
 ## Design questions
 
-- Before slice 7: how should Swift call the selected model, which inference library should load it, and what audio format/transfer mechanism should connect Recording to Transcription? Decide where the existing app UI composes these dependencies and how inference avoids blocking UI updates. Document any required contract changes before implementing them.
+- Before slice 7: how should Swift call the selected model, which inference library should load it, and what audio format/transfer mechanism should connect Recording to Transcription? Decide where the existing app UI composes these dependencies and how inference avoids blocking UI updates while preserving existing contracts.
+- Before slice 8: decide Control double-tap timing and event handling, real editable-focus inspection and paste support, notification wiring, and UI behavior during capture/inference. Define setup permissions and a repeatable way to exercise inference and delivery failures without changing the final contracts.
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
 - Which text-correction LLM and silence-detection behavior meet the requirements? The speech model is fixed above; its inference library and Swift integration remain undecided. Model files are prepared during setup; runtime integration and validation are still pending.
 - Which applications and formatting/style rules must TextCorrection support? When should application context be sampled? Destination focus is explicitly checked at paste time.
@@ -100,6 +118,6 @@ Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and
 The three selection tests listed in slice 4 belong only to slice 4; the four
 delivery-discard/recovery tests listed in slice 5 belong only to slice 5.
 
-Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; their design remains unresolved above. Real correction, global shortcut, external clipboard delivery, and notification wiring remain outside slice 7 and need later integration planning.
+Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Slice 7 plans real Recording/Transcription dependency composition and placeholder UI replacement; slice 8 plans global shortcut, external clipboard delivery, and notification wiring. DEV-7 checks belong only to slice 7; DEV-8 checks belong only to slice 8. Real LLM correction and application-style integration remain unfinished; the temporary identity closure does not fulfill TextCorrection's final behavior.
 
 Next action: Slice 7, Minimal real-device transcription — decide the Swift-to-MLX integration approach before implementation; slice 6 remains pending.

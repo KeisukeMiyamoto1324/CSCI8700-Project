@@ -45,6 +45,40 @@ injected-closure tests do not load the model or establish speech-recognition qua
 The inference library, Swift integration, and silence-detection details remain
 to be decided; no thresholds or quality scores are specified here.
 
+## Development-stage real-device checks (no LLM)
+
+These checks cover slices 7–8, not final product acceptance. Slice 7 uses app
+buttons and shows the transcript. Slice 8 uses the existing VoiceTypingFlow and
+TextCorrection module with a development-only inference closure that returns
+the input unchanged, then delivers through real ClipboardPaste dependencies.
+No LLM is loaded; spelling/wording correction and application-style adjustment
+remain incomplete. Keep AC-001 and all existing tests unchanged; passing these
+checks does not establish AC-001 or ten-language support.
+
+Prepare model files and required permissions during setup. Use English initially
+and the specified `mlx-community/whisper-large-v3-turbo-4bit` model locally.
+For delivery checks, use TextEdit fields/documents as destinations and prepare
+clipboard/field contents whose changes can be observed. Verify actual destination
+content as well as flow results; `.pasted` alone only confirms command completion.
+
+| ID | Slice | Procedure and expected result | Status |
+|---|---|---|---|
+| DEV-7-01 | 7 | Start/stop real microphone capture using app buttons. Verify the specified local model transcribes the recording and the result appears in the app. Record the model revision and check that runtime sends no audio or text to external servers. | not run |
+| DEV-7-02 | 7 | Record two different sentences in succession. Each run displays its own transcription, without reusing earlier audio/text, and the UI remains usable during inference. | not run |
+| DEV-8-01 | 8 | With an editable field selected, double-tap Control to start capture, speak, and double-tap again to stop. Verify automatic clipboard/paste delivery. Inspect the development TextCorrection input/output and confirm exact equality; inserted text matches the transcription without LLM changes. | not run |
+| DEV-8-02 | 8 | Start in field A, select B before stopping, then C before paste. Verify only C receives the transcription. Repeat keeping B selected; only B receives it. | not run |
+| DEV-8-03 | 8 | Finish with no editable field selected. Verify discard, unchanged clipboard, and no paste command. Select a field and invoke the shortcut: fresh capture starts, and no previous text is delivered. | not run |
+| DEV-8-04 | 8 | Record silence and non-speech separately. Verify an empty/blank transcription is discarded with no TextCorrection, clipboard, paste, or notification call. Repeat with speech as a successful control. | not run |
+| DEV-8-05 | 8 | Make transcription inference fail in a controlled run. Verify exactly one actual macOS notification, propagated failure, no clipboard/field change, and discarded audio/intermediate text. Restore inference and verify a fresh recording succeeds without retrying old text. | not run |
+| DEV-8-06 | 8 | Exercise focus inspection, clipboard write, and paste-command failures separately through the delivery dependency boundary. Verify original failure propagation, no inference notification, no automatic retry, and fresh capture afterward. A failed paste may already have written the clipboard; do not require rollback or delivery confirmation from the destination. | not run |
+| DEV-8-07 | 8 | Run the existing automated suite: all 16 tests must pass, including the original correction-path AC-001 test. Keep development identity correction out of the existing test configuration. | not run |
+
+Record setup, model revision, observed outcomes, and whether a failure was injected
+or arose from an actual OS operation. These checks are not new XCTest method names.
+They are planned and unexecuted; failure-injection mechanics and inference/OS
+integration details must be settled before implementation. Final correction,
+style, and ten-language checks above remain required for the complete application.
+
 ## Spec gaps
 
 | Gap | Unresolved detail |
