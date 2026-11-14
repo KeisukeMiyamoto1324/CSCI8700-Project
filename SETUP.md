@@ -4,6 +4,14 @@ Open `CSCI8700-Project.xcodeproj`, select `CSCI8700-Project` and **My Mac**, and
 Swift Package Manager resolves the local VoiceTypingModels package and its Swift
 MLX dependencies. This personal build runs without App Sandbox.
 
+The app and test targets use automatic signing with the existing development
+team. On another Mac, select your own team in Signing & Capabilities for both
+targets. An ad-hoc signature has no Team ID: macOS can reject its automatic
+AppIntents registration with `com.apple.linkd.autoShortcut` error 4097.
+After changing from an ad-hoc signature, remove the old app entry from the
+Accessibility permission list and add the currently built app again if access
+still fails. Multiple build folders can contain apps with the same name.
+
 Choose **Prepare models and permissions**. Allow microphone, Accessibility,
 Input Monitoring/event posting, and notifications for the app in System Settings.
 If a permission was changed, prepare again (restart the app if macOS requests it).
@@ -33,3 +41,9 @@ xcodebuild test -project CSCI8700-Project.xcodeproj \
 Unit tests use injected OS/inference boundaries and need no microphone or model
 downloads. Real microphone/paste/notifications and ten-language quality require
 separate hands-on verification; see `test_results.md` for observed results.
+
+MLX may print `Compilation succeeded with` followed by `-Wunused-const-variable`
+warnings for its Metal kernel constants. These are runtime shader compilation
+warnings from the dependency, not failed model inference. The upstream constants
+are in [MLX defines.h](https://github.com/ml-explore/mlx/blob/main/mlx/backend/metal/kernels/defines.h).
+They remain unchanged; other compilation errors should still be investigated.

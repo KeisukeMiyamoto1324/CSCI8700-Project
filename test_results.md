@@ -1,3 +1,26 @@
+# Signing fix verification
+
+The macOS `linkd` log identified the AppIntents 4097 cause as
+`Unable to get teamId` and rejected the app as an invalid client. The app used
+an ad-hoc signature. Both app and test targets now select the installed Apple
+Development certificate through automatic signing and the development team.
+
+After rebuilding, `codesign -dv` reports the expected TeamIdentifier and the
+`linkd` log accepts the new app process on `com.apple.linkd.autoShortcut`.
+The new Xcode launch console contains no AppIntents connection errors.
+The subsequent repeated Accessibility prompt was traced to an old ad-hoc build
+in another build folder. macOS logged a code-requirement mismatch. The user
+confirmed the permission setup worked after removing the old entry and adding
+the current signed app again.
+
+Regression run: **22 passed, 1 skipped, 0 failures** (`xcodebuild test` using the
+ordinary command in SETUP.md). The opt-in real-model test was not rerun for this
+signing-only change. Log: `/tmp/csci8700-signed-tests.log`.
+
+The reported Metal unused-constant warnings originate in the MLX dependency;
+they remain unresolved upstream. Runtime compilation reports success. No warning
+suppression, dependency checkout patches, or inference behavior changes were made.
+
 # Native runtime integration result
 
 Automated verification on this Apple Silicon Mac: **23 tests passed, 0 failures**.
