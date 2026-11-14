@@ -4,6 +4,93 @@ import XCTest
 
 final class VoiceTypingAcceptanceTests: XCTestCase {
     @MainActor
+    func test_FR006_pastesIntoSelectionChangedBeforePaste() throws -> Void {
+        try checkPasteSelection(destination: "C")
+    }
+
+    @MainActor
+    func test_FR006_pastesIntoUnchangedSelection() throws -> Void {
+        try checkPasteSelection(destination: "B")
+    }
+
+    @MainActor
+    func test_FR006_skipsClipboardAndPasteWithoutEditableSelection() throws -> Void {
+        try checkPasteSelection(destination: nil)
+    }
+
+    // ---------------------------------------------------------
+    // Start in A, stop in B, then set the selection during correction.
+    // The simulated paste command writes only to the selected field.
+    // ---------------------------------------------------------
+    @MainActor
+    private func checkPasteSelection(destination: String?) throws -> Void {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
+        var selection: String? = "A"
+        var fields = ["A": "", "B": "", "C": ""]
+        var clipboard = "Existing clipboard"
+        var events: [String] = []
+        let recording = try Recording(
+            startCapture: { events.append("start") },
+            stopCapture: {
+                events.append("stop")
+                return audio
+            }
+        )
+        let transcription = try Transcription(localInference: { _, _ in
+            events.append("transcribe")
+            return "Please send teh report."
+        })
+        let correction = try TextCorrection(localInference: { _, _, application in
+            events.append("correct")
+            XCTAssertEqual(application, "B")
+            selection = destination
+            return "Please send the report."
+        })
+        let paste = try ClipboardPaste(
+            activeApplication: {
+                events.append("application")
+                return selection
+            },
+            hasEditableSelection: {
+                events.append("focus")
+                return selection != nil
+            },
+            writeClipboard: { text in
+                events.append("clipboard")
+                clipboard = text
+            },
+            sendPasteCommand: {
+                events.append("paste")
+                let field = try XCTUnwrap(selection)
+                fields[field] = clipboard
+            }
+        )
+        let flow = try VoiceTypingFlow(
+            recording: recording, transcription: transcription, textCorrection: correction,
+            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
+            registerShortcut: { _, _ in },
+            notifyInferenceFailure: { events.append("notify") }
+        )
+
+        // ---------------------------------------------------------
+        // Application context does not fix the eventual delivery field.
+        // ---------------------------------------------------------
+        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
+        selection = "B"
+        XCTAssertEqual(try flow.handleShortcut(), destination == nil ? .discarded : .pasted)
+        var expectedFields = ["A": "", "B": "", "C": ""]
+        var expectedEvents = ["start", "stop", "transcribe", "application", "correct", "focus"]
+        if let destination {
+            expectedFields[destination] = "Please send the report."
+            expectedEvents += ["clipboard", "paste"]
+        }
+        XCTAssertEqual(fields, expectedFields)
+        XCTAssertEqual(events, expectedEvents)
+        XCTAssertEqual(clipboard, destination == nil ? "Existing clipboard" : "Please send the report.")
+    }
+
+    @MainActor
     func test_FR007_notifiesOnTranscriptionFailureAndRecovers() throws -> Void {
         try checkFailure(
             at: "transcribe",

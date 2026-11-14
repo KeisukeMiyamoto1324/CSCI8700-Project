@@ -36,10 +36,10 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    **Goal:** Deliver to the field selected at paste time and skip clipboard writing and paste when no editable field exists.
    **Spec sources:** spec Functional Requirements FR-003, FR-006; architecture §3 step 4, §5; contracts ClipboardPaste Methods.
    **Criteria:** None; FR-006 has no acceptance criterion.
-   **Tests that should turn green:** None in the current suite.
+   **Tests that should turn green:** `test_FR006_pastesIntoSelectionChangedBeforePaste`, `test_FR006_pastesIntoUnchangedSelection`, `test_FR006_skipsClipboardAndPasteWithoutEditableSelection`.
    **Depends on:** 1.
    **Done when:** The listed tests pass and no previously passing test fails; verify changed-focus and absent-selection probes from test_plan “Extra cases.”
-   **Status:** not started.
+   **Status:** implemented by existing selection-at-paste behavior; dedicated tests added. Real macOS focus detection remains unverified.
 
 5. **Name:** Delivery failure cleanup.
    **Goal:** Discard undelivered text without retry after rejected or failed delivery, and allow a new recording.
@@ -61,7 +61,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Test issues
 
-- The suite covers AC-001 coordination, Slice 2 blank-transcription behavior, and Slice 3 inference-failure handling and recovery. Slices 4–6 still need dedicated coverage.
+- The suite covers AC-001 coordination and Slices 2–4. Slices 5–6 still need dedicated coverage.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
@@ -79,4 +79,4 @@ Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and
 
 Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Real dependency composition and placeholder UI replacement remain unresolved under Design questions, outside the contracted module surface.
 
-Next action: Slice 4, Paste-time selection — add tests for changed focus and no editable selection.
+Next action: Slice 5, Delivery failure cleanup — test rejection and delivery-stage failures followed by fresh capture.

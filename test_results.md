@@ -1,5 +1,24 @@
 # Test results
 
+## Slice 4 result
+
+Added `test_FR006_pastesIntoSelectionChangedBeforePaste`,
+`test_FR006_pastesIntoUnchangedSelection`, and
+`test_FR006_skipsClipboardAndPasteWithoutEditableSelection`.
+They cover A → B → C selection changes, the B-selection control, and absence of
+editable selection. Only the final selected field changes; no selection leaves
+the clipboard untouched and sends no paste or notification.
+
+The existing implementation already supplies this behavior; no production-code
+change was necessary. Full-suite command is the same as Slice 3 below.
+Actual macOS focus and paste are simulated, not validated.
+Output: `/tmp/csci8700-slice4-test-output.log`.
+
+```text
+Executed 12 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
 ## Slice 3 result (2026-11-13)
 
 Added four FR-007 tests; existing tests were unchanged. Before implementation,

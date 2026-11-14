@@ -10,6 +10,9 @@ is forwarded unchanged. Slice 3 invokes the injected notification once when
 transcription or correction throws, then rethrows the original error. Intermediate
 audio and text remain local to the call; the next shortcut starts fresh capture.
 Lookup and delivery failures do not trigger inference notifications.
+Slice 4 verifies that selection is checked during paste, independently of the
+application context read before correction. No editable selection means no
+clipboard write or paste command.
 The tables describe the full intended behavior. Real microphone, MLX, and
 macOS operations are not wired into the app yet.
 
