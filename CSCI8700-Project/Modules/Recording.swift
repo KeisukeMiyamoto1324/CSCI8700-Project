@@ -11,18 +11,22 @@ protocol RecordingContract {
 
 @MainActor
 final class Recording: RecordingContract {
+    private let startCapture: () throws -> Void
+    private let stopCapture: () throws -> AVAudioPCMBuffer
+
     init(
         startCapture: @escaping () throws -> Void,
         stopCapture: @escaping () throws -> AVAudioPCMBuffer
     ) throws {
-        throw SkeletonError.notImplemented
+        self.startCapture = startCapture
+        self.stopCapture = stopCapture
     }
 
     func start() throws -> Void {
-        throw SkeletonError.notImplemented
+        try startCapture()
     }
 
     func stop() throws -> AVAudioPCMBuffer {
-        throw SkeletonError.notImplemented
+        return try stopCapture()
     }
 }
