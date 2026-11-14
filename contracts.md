@@ -1,90 +1,65 @@
 # Contracts
 
-These are the target contracts for `CSCI8700-Project/Modules/`; implementation and tests must be aligned with this update.
-All module classes and protocols use `@MainActor`.
-Slice 1 implements dependency forwarding, shortcut registration, and the successful
-recording-to-paste flow.
-Slice 2 discards transcription that is empty after trimming `.whitespacesAndNewlines`,
-without correction, delivery, or notification. Nonempty text
-is forwarded unchanged. Slice 3 invokes the injected notification once when
-transcription or correction throws, then rethrows the original error. Intermediate
-audio and text remain local to the call; the next shortcut starts fresh capture.
-Delivery failures do not trigger inference notifications.
-Slice 4 verifies that selection is checked during paste. No editable selection means no
-clipboard write or paste command.
-Slice 5 verifies rejection and focus/clipboard/paste failures: no retained pending
-text, no retry or inference notification, and fresh capture on the next shortcut.
-Errors propagate unchanged. Paste failure may leave the clipboard already written;
-no clipboard rollback is promised.
-The tables describe the full intended behavior. Real microphone, MLX, and
-macOS operations are not wired into the app yet.
+The Swift app uses five logical modules. Public coordination and OS-facing modules
+are `@MainActor`; a `LocalModels` actor owns MLX inference off the main actor.
+The app composition (`VoiceTypingAppModel`) injects real implementations of the
+same boundaries used by tests. Application identifiers are neither acquired nor passed.
 
 ## Methods
 
-The production `Transcription.localInference` dependency shall run
-[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
-locally through MLX (Whisper Large v3 Turbo, 4-bit quantization), as required by
-spec Technical Constraints. Model files are prepared during initial setup.
-This dependency shall first check speech locally with Silero VAD and return an
-empty string without Whisper inference when no speech is detected. VAD remains
-inside the existing Transcription dependency; signatures are unchanged.
-Injected test closures may supply fixed results; they do not validate model use,
-accuracy, or silence detection. Existing signatures are unchanged, and the
-production model dependency is not connected yet.
+| Module / signature | Success and side effects | Failure |
+|---|---|---|
+| Recording: `start() throws -> Void` | Begins microphone capture. | Capture error propagates. |
+| Recording: `stop() throws -> AVAudioPCMBuffer` | Stops capture, clears capture storage, returns mono float32 audio at 16 kHz. | Capture/conversion error propagates; flow returns to idle. |
+| Transcription: `transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult` | Runs local Silero VAD. No speech returns empty text and no language, without Whisper. Otherwise runs specified Whisper with automatic language detection. | VAD or transcription error propagates. |
+| TextCorrection: `correct(text: String, language: Language) async throws -> String` | Runs local LFM with the same minimal-correction prompt for every destination, returning corrected text only. | Inference, empty-output, or generation-limit failure propagates. |
+| ClipboardPaste: `paste(text: String) throws -> Bool` | At delivery time, checks editable focus, writes the clipboard, and posts Command-V; returns true. No editable focus returns false without writing or posting. | Focus/clipboard/event failure propagates. No rollback or retry. |
+| VoiceTypingFlow: `handleShortcut() async throws -> ShortcutResult` | Idle starts capture. Recording stops capture, awaits transcription/correction, and attempts delivery. Empty text discards. Unsupported detected language discards before correction/delivery. Processing ignores new shortcuts. | Inference failures notify once and rethrow the original error. Capture/delivery failures do not trigger inference notifications. Request-local audio/text is discarded; next shortcut starts fresh. |
 
-The production `TextCorrection.localInference` dependency shall use
-[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
-locally through MLX, using the existing text and language arguments and the
-repository's `4bit/` variant. Use identical minimal-correction rules in every application:
-preserve language and meaning, fix spelling/grammar/unnatural wording, preserve
-names/numbers/negations/dates, and add no information or explanation. Prompt and inference
-integration remain undecided.
-Model selection does not change any signature or complete model integration.
-Injected test closures do not establish correction quality or language coverage.
-
-| Module / signature | Success result and side effects | Failure | Spec rule |
-|---|---|---|---|
-| Recording: `start() throws -> Void` | Starts one microphone recording. | Throws on capture failure. | FR-001 |
-| Recording: `stop() throws -> AVAudioPCMBuffer` | Stops recording and returns the recorded audio. | Throws on capture failure. | FR-001 |
-| Transcription: `transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String` | Returns a local transcription in the selected language, or an empty string for silent or non-speech audio. | Throws on local inference failure. | FR-001, FR-005, FR-008 |
-| TextCorrection: `correct(text: String, language: Language) throws -> String` | Returns locally corrected text using the same minimal-correction rules in every application, preserving language and meaning. | Throws on local inference failure. | FR-002, FR-004, FR-005 |
-| ClipboardPaste: `paste(text: String) throws -> Bool` | With an editable field selected, writes the clipboard, sends paste, and returns `true`. Otherwise returns `false` without writing the clipboard or sending paste. | Throws on focus, clipboard, or paste-command failure. | FR-003, FR-006 |
-| VoiceTypingFlow: `handleShortcut() throws -> ShortcutResult` | Idle: starts recording on a Control double-tap and returns `.recordingStarted`. Recording: stops, transcribes, corrects, and attempts paste. Returns `.pasted` after delivery, or `.discarded` for empty transcription or no editable selection. Undelivered text is discarded without retry. | On inference failure, displays a macOS notification and discards recording and intermediate text before throwing. Other dependency failures throw; undelivered text is discarded without retry. | FR-001–FR-008, AC-001 |
-
-`true` / `.pasted` means the paste command completed; it does not confirm that the destination application inserted the text.
-Error types are not specified. Inference failures follow FR-007; silent or non-speech audio follows FR-008.
-For VoiceTypingFlow, empty transcription includes whitespace/newline-only output.
-After discarding it, the next shortcut starts a fresh recording.
+`.pasted` confirms that the paste events were posted, not that another application
+inserted text. Successful destination insertion needs real-device validation.
+No pending-text queue or retry exists. Clipboard contents may already have changed
+when posting fails. Missing language on nonblank transcription and blank correction
+are inference failures. Blank means empty after `.whitespacesAndNewlines` trimming;
+nonblank transcription is passed unchanged into correction.
 
 ## Initializers and injected dependencies
 
-Each initializer returns a configured instance on success. All are `throws`; setup error types are not specified.
-Closure arguments use `@escaping`.
-The fixed shortcut is represented by the string `"control-double-tap"`.
+All module initializers remain `throws`. Inference closures and shortcut handlers
+are asynchronous; OS capture and paste closures are synchronous on the main actor.
 
-| Class | Exact initializer signature | Injected dependencies | Spec rule |
-|---|---|---|---|
-| Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` | Microphone start and stop operations. | FR-001 |
-| Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference using `mlx-community/whisper-large-v3-turbo-4bit` in production. | FR-001, FR-005; Technical Constraints |
-| TextCorrection | `init(localInference: @escaping (String, Language) throws -> String) throws` | Local MLX `LiquidAI/LFM2.5-2.6B-MLX` inference using `4bit/` and application-independent correction rules in production. | FR-002, FR-004, FR-005; Technical Constraints |
-| ClipboardPaste | `init(hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Focus inspection, clipboard writing, and paste command. | FR-003, FR-006 |
-| VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` | Four module contracts, language, fixed Control double-tap shortcut and registration, and macOS inference-failure notification. | FR-001–FR-008, AC-001 |
+| Class | Signature |
+|---|---|
+| Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` |
+| Transcription | `init(localInference: @escaping (AVAudioPCMBuffer) async throws -> TranscriptionResult) throws` |
+| TextCorrection | `init(localInference: @escaping (String, Language) async throws -> String) throws` |
+| ClipboardPaste | `init(hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` |
+| VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, shortcut: String, registerShortcut: @escaping (String, @escaping () async throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` |
 
 ## Shared types
 
 | Type | Values |
 |---|---|
-| `Language: String, CaseIterable` | `english = "en"`, `arabic = "ar"`, `chinese = "zh"`, `french = "fr"`, `german = "de"`, `italian = "it"`, `japanese = "ja"`, `korean = "ko"`, `portuguese = "pt"`, `spanish = "es"` |
-| `ShortcutResult: Equatable` | `.recordingStarted`, `.pasted`, `.discarded` |
-| `SkeletonError: Error` | `.notImplemented` |
+| `Language: String, CaseIterable, Sendable` | english/en, arabic/ar, chinese/zh, french/fr, german/de, italian/it, japanese/ja, korean/ko, portuguese/pt, spanish/es |
+| `TranscriptionResult: Equatable, Sendable` | `text: String`, `languageCode: String?` (ISO code; nil for no speech) |
+| `ShortcutResult: Equatable` | `.recordingStarted`, `.pasted`, `.discarded`, `.busy`, `.unsupportedLanguage(String)` |
+| `VoiceTypingError` | invalidLanguage, invalidCorrection, notReady, capture, focus, clipboard, paste |
 
-## Start the skeleton
+`lastResult` exposes only the flow outcome for UI status, never recorded audio or
+intermediate text. The fixed shortcut string is `control-double-tap`.
 
-From the repository root:
+## Production inference
 
-```sh
-open CSCI8700-Project.xcodeproj
-```
+Speech: [`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit).
+VAD: local Silero VAD (`mlx-community/silero-vad`) with its supplied configuration.
+Correction: [`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX), `4bit/`.
 
-In Xcode, select the `CSCI8700-Project` scheme and **My Mac**, then press **Command-R**.
-The app displays a placeholder window; voice typing is not connected yet.
+Initial setup downloads weights and tokenizer assets to local Application Support.
+Runtime loads only those folders. LFM uses temperature 0 and a 4096-token output
+limit; reaching the limit is a failure, not a truncated successful result. The
+prompt preserves language, meaning, names, numbers, negations, and dates, makes
+minimal spelling/grammar/wording changes, and returns no explanation or new facts.
+The LFM container separates always-on reasoning from final answer chunks; reasoning
+content is never pasted. Input is delimited transcription data, never a conversational
+request to answer. Tests with injected inference results establish forwarding/error handling, not
+real-model correction quality or ten-language accuracy.

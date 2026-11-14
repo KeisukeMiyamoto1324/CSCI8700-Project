@@ -3,26 +3,22 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 110;
+	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		98D8FCB7ECA698CAC0B2E65D /* VoiceTypingModels in Frameworks */ = {isa = PBXBuildFile; productRef = BDA418EDCD2D2488DE4E4047 /* VoiceTypingModels */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
-		AC0010000000000000000001 = {
+		AC0010000000000000000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = DFB9BD9730A1229600C28A78;
+			containerPortal = DFB9BD9730A1229600C28A78 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = DFB9BD9E30A1229600C28A78;
 			remoteInfo = "CSCI8700-Project";
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXTargetDependency section */
-		AC0010000000000000000002 = {
-			isa = PBXTargetDependency;
-			target = DFB9BD9E30A1229600C28A78;
-			targetProxy = AC0010000000000000000001;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin PBXFileReference section */
 		DFA5FE7630A127EB00178A22 /* CSCI8700-ProjectTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "CSCI8700-ProjectTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -45,13 +41,18 @@
 /* Begin PBXFrameworksBuildPhase section */
 		DFA5FE7330A127EB00178A22 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DFB9BD9C30A1229600C28A78 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
+				98D8FCB7ECA698CAC0B2E65D /* VoiceTypingModels in Frameworks */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -87,11 +88,15 @@
 			);
 			buildRules = (
 			);
+			dependencies = (
+				AC0010000000000000000002 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				DFA5FE7730A127EB00178A22 /* CSCI8700-ProjectTests */,
 			);
-			dependencies = (AC0010000000000000000002,);
 			name = "CSCI8700-ProjectTests";
+			packageProductDependencies = (
+			);
 			productName = "CSCI8700-ProjectTests";
 			productReference = DFA5FE7630A127EB00178A22 /* CSCI8700-ProjectTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -106,10 +111,15 @@
 			);
 			buildRules = (
 			);
+			dependencies = (
+			);
 			fileSystemSynchronizedGroups = (
 				DFB9BDA130A1229600C28A78 /* CSCI8700-Project */,
 			);
 			name = "CSCI8700-Project";
+			packageProductDependencies = (
+				BDA418EDCD2D2488DE4E4047 /* VoiceTypingModels */,
+			);
 			productName = "CSCI8700-Project";
 			productReference = DFB9BD9F30A1229600C28A78 /* CSCI8700-Project.app */;
 			productType = "com.apple.product-type.application";
@@ -142,6 +152,9 @@
 			);
 			mainGroup = DFB9BD9630A1229600C28A78;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CD7C4B05CBA573B32A8170CB /* XCLocalSwiftPackageReference "Packages/VoiceTypingModels" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DFB9BDA030A1229600C28A78 /* Products */;
 			projectDirPath = "";
@@ -156,33 +169,50 @@
 /* Begin PBXResourcesBuildPhase section */
 		DFA5FE7430A127EB00178A22 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DFB9BD9D30A1229600C28A78 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		DFA5FE7230A127EB00178A22 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DFB9BD9B30A1229600C28A78 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AC0010000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DFB9BD9E30A1229600C28A78 /* CSCI8700-Project */;
+			targetProxy = AC0010000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		DFA5FE7A30A127EB00178A22 /* Debug configuration for PBXNativeTarget "CSCI8700-ProjectTests" */ = {
+		DFA5FE7A30A127EB00178A22 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -192,8 +222,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.CSCI8700-ProjectTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CSCI8700-Project.app/Contents/MacOS/CSCI8700-Project";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -201,13 +229,15 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CSCI8700-Project.app/Contents/MacOS/CSCI8700-Project";
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
 		};
-		DFA5FE7B30A127EB00178A22 /* Release configuration for PBXNativeTarget "CSCI8700-ProjectTests" */ = {
+		DFA5FE7B30A127EB00178A22 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -217,8 +247,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.CSCI8700-ProjectTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CSCI8700-Project.app/Contents/MacOS/CSCI8700-Project";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -226,11 +254,12 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CSCI8700-Project.app/Contents/MacOS/CSCI8700-Project";
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
 		};
-		DFB9BDA830A1229700C28A78 /* Debug configuration for PBXProject "CSCI8700-Project" */ = {
+		DFB9BDA830A1229700C28A78 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -293,7 +322,7 @@
 			};
 			name = Debug;
 		};
-		DFB9BDA930A1229700C28A78 /* Release configuration for PBXProject "CSCI8700-Project" */ = {
+		DFB9BDA930A1229700C28A78 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -348,7 +377,7 @@
 			};
 			name = Release;
 		};
-		DFB9BDAB30A1229700C28A78 /* Debug configuration for PBXNativeTarget "CSCI8700-Project" */ = {
+		DFB9BDAB30A1229700C28A78 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -356,11 +385,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record speech for local voice typing.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -371,14 +401,14 @@
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		DFB9BDAC30A1229700C28A78 /* Release configuration for PBXNativeTarget "CSCI8700-Project" */ = {
+		DFB9BDAC30A1229700C28A78 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -386,11 +416,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record speech for local voice typing.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -401,7 +432,7 @@
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -414,29 +445,46 @@
 		DFA5FE7C30A127EB00178A22 /* Build configuration list for PBXNativeTarget "CSCI8700-ProjectTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DFA5FE7A30A127EB00178A22 /* Debug configuration for PBXNativeTarget "CSCI8700-ProjectTests" */,
-				DFA5FE7B30A127EB00178A22 /* Release configuration for PBXNativeTarget "CSCI8700-ProjectTests" */,
+				DFA5FE7A30A127EB00178A22 /* Debug */,
+				DFA5FE7B30A127EB00178A22 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		DFB9BD9A30A1229600C28A78 /* Build configuration list for PBXProject "CSCI8700-Project" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DFB9BDA830A1229700C28A78 /* Debug configuration for PBXProject "CSCI8700-Project" */,
-				DFB9BDA930A1229700C28A78 /* Release configuration for PBXProject "CSCI8700-Project" */,
+				DFB9BDA830A1229700C28A78 /* Debug */,
+				DFB9BDA930A1229700C28A78 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		DFB9BDAA30A1229700C28A78 /* Build configuration list for PBXNativeTarget "CSCI8700-Project" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				DFB9BDAB30A1229700C28A78 /* Debug configuration for PBXNativeTarget "CSCI8700-Project" */,
-				DFB9BDAC30A1229700C28A78 /* Release configuration for PBXNativeTarget "CSCI8700-Project" */,
+				DFB9BDAB30A1229700C28A78 /* Debug */,
+				DFB9BDAC30A1229700C28A78 /* Release */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CD7C4B05CBA573B32A8170CB /* XCLocalSwiftPackageReference "Packages/VoiceTypingModels" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/VoiceTypingModels;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BDA418EDCD2D2488DE4E4047 /* VoiceTypingModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CD7C4B05CBA573B32A8170CB /* XCLocalSwiftPackageReference "Packages/VoiceTypingModels" */;
+			productName = VoiceTypingModels;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = DFB9BD9730A1229600C28A78 /* Project object */;
-	validationLevel = 1;
 }

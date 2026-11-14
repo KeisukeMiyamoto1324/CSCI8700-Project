@@ -1,37 +1,32 @@
 import AVFoundation
 
-// ---------------------------------------------------------
-// Define supported languages and local speech inference.
-// ---------------------------------------------------------
-enum Language: String, CaseIterable {
-    case english = "en"
-    case arabic = "ar"
-    case chinese = "zh"
-    case french = "fr"
-    case german = "de"
-    case italian = "it"
-    case japanese = "ja"
-    case korean = "ko"
-    case portuguese = "pt"
-    case spanish = "es"
+enum Language: String, CaseIterable, Sendable {
+    case english = "en", arabic = "ar", chinese = "zh", french = "fr", german = "de"
+    case italian = "it", japanese = "ja", korean = "ko", portuguese = "pt", spanish = "es"
 }
 
+struct TranscriptionResult: Equatable, Sendable {
+    let text: String
+    let languageCode: String?
+}
+
+// ---------------------------------------------------------
+// Keep language detection with transcription, not in the UI.
+// ---------------------------------------------------------
 @MainActor
 protocol TranscriptionContract {
-    func transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String
+    func transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult
 }
 
 @MainActor
 final class Transcription: TranscriptionContract {
-    private let localInference: (AVAudioPCMBuffer, Language) throws -> String
+    private let localInference: (AVAudioPCMBuffer) async throws -> TranscriptionResult
 
-    init(
-        localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String
-    ) throws {
+    init(localInference: @escaping (AVAudioPCMBuffer) async throws -> TranscriptionResult) throws {
         self.localInference = localInference
     }
 
-    func transcribe(audio: AVAudioPCMBuffer, language: Language) throws -> String {
-        return try localInference(audio, language)
+    func transcribe(audio: AVAudioPCMBuffer) async throws -> TranscriptionResult {
+        return try await localInference(audio)
     }
 }

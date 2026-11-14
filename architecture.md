@@ -59,3 +59,38 @@ Longer recordings or a wider range of Macs would require latency and memory meas
 # 6. Out of scope
 
 Runtime handling of missing models or permissions, concurrent operations, pending-text retention, and delivery retries are outside scope (Scope; FR-006).
+
+# 7. Native runtime integration
+
+The same five logical modules are retained. Real OS adapters and app composition
+live in `Runtime/`; these are implementation helpers, not additional services.
+`VoiceTypingAppModel` holds the flow, exposes status/setup UI, and serializes user
+operations. `MicrophoneCapture` uses AVAudioEngine and converts captured audio to
+mono float32 at 16 kHz. The tap uses locked capture storage, cleared on stop/failure.
+
+`LocalModels`, in the local `VoiceTypingModels` Swift package, owns Silero,
+Whisper, and LFM inference on a non-main actor. Dependencies are `mlx-audio-swift`
+(Core/VAD) and `mlx-swift-lm`. The small MIT-licensed Whisper compatibility layer
+adds explicit language-token detection and forbids tokenizer downloads at runtime.
+The Whisper decoder automatically identifies an ISO language code; the flow maps
+it to the ten supported languages. Unsupported codes discard without LFM/paste;
+missing language on nonblank text is an inference failure.
+
+Transcription, correction, and shortcut handling use async contracts. No UI thread
+waits synchronously for model execution. Only one capture/request runs; shortcuts
+during inference are ignored. Audio and intermediate text are not retained in UI.
+Initial model preparation is an explicit network-enabled setup operation. It also
+requests microphone, Accessibility, event-monitoring/posting, and notification
+permissions. Runtime model loading uses local paths only.
+
+`ControlShortcut` observes local/global key events. Two Control-only taps within
+0.3 seconds trigger the flow; intervening keys/modifiers reset detection.
+`SystemDelivery` inspects accessibility focus without reading app identifiers,
+rejects secure/noneditable fields, writes NSPasteboard, and posts Command-V.
+A selected element's application is represented only by the accessibility object
+needed to inspect focus, never by bundle ID or stored application identity.
+
+This personal macOS build disables App Sandbox for cross-application interaction.
+The setup UI gives permission instructions and reports progress/failure. No LLM
+identity stub is used in the production path. Real OS behavior and multilingual
+model quality require separate validation from injected-boundary unit tests.

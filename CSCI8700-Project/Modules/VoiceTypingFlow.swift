@@ -1,20 +1,29 @@
 import Foundation
 
-// ---------------------------------------------------------
-// Define the shared stub error and shortcut outcomes.
-// ---------------------------------------------------------
-enum SkeletonError: Error {
-    case notImplemented
-}
-
 enum ShortcutResult: Equatable {
-    case recordingStarted
-    case pasted
-    case discarded
+    case recordingStarted, pasted, discarded, busy
+    case unsupportedLanguage(String)
+}
+
+enum VoiceTypingError: Error, LocalizedError, Equatable {
+    case invalidLanguage, invalidCorrection, notReady, capture, focus, clipboard, paste
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidLanguage: return "Speech language could not be detected."
+        case .invalidCorrection: return "Correction was empty or incomplete."
+        case .notReady: return "Complete setup before recording."
+        case .capture: return "Microphone capture failed."
+        case .focus: return "Could not inspect the selected field."
+        case .clipboard: return "Could not write the clipboard."
+        case .paste: return "Could not send the paste command."
+        }
+    }
 }
 
 // ---------------------------------------------------------
-// Define coordination using replaceable module dependencies.
+// Serialize one recording and its inference/delivery request.
+// Keep audio and intermediate text local, with no pending-text state.
 // ---------------------------------------------------------
 @MainActor
 final class VoiceTypingFlow {
@@ -22,86 +31,77 @@ final class VoiceTypingFlow {
     private let transcription: any TranscriptionContract
     private let textCorrection: any TextCorrectionContract
     private let clipboardPaste: any ClipboardPasteContract
-    private let language: Language
     private let notifyInferenceFailure: () -> Void
+    private(set) var lastResult: ShortcutResult?
     private var isRecording = false
+    private var isProcessing = false
 
     init(
         recording: any RecordingContract,
         transcription: any TranscriptionContract,
         textCorrection: any TextCorrectionContract,
         clipboardPaste: any ClipboardPasteContract,
-        language: Language,
         shortcut: String,
-        registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void,
+        registerShortcut: @escaping (String, @escaping () async throws -> Void) throws -> Void,
         notifyInferenceFailure: @escaping () -> Void
     ) throws {
         self.recording = recording
         self.transcription = transcription
         self.textCorrection = textCorrection
         self.clipboardPaste = clipboardPaste
-        self.language = language
         self.notifyInferenceFailure = notifyInferenceFailure
-
-        // ---------------------------------------------------------
-        // Register without retaining the flow through the handler.
-        // ---------------------------------------------------------
-        try registerShortcut(shortcut) { [weak self] () throws -> Void in
-            _ = try self?.handleShortcut()
+        try registerShortcut(shortcut) { [weak self] () async throws -> Void in
+            _ = try await self?.handleShortcut()
         }
     }
 
-    func handleShortcut() throws -> ShortcutResult {
-        // ---------------------------------------------------------
-        // Start capture on the first shortcut and process on the next.
-        // ---------------------------------------------------------
+    func handleShortcut() async throws -> ShortcutResult {
+        guard !isProcessing else { return .busy }
         guard isRecording else {
             try recording.start()
             isRecording = true
+            lastResult = .recordingStarted
             return .recordingStarted
         }
-
-        let audio = try recording.stop()
         isRecording = false
-        // ---------------------------------------------------------
-        // Notify only for transcription inference errors, then rethrow.
-        // Request-local audio and text are released when the call exits.
-        // ---------------------------------------------------------
-        let text: String
+        isProcessing = true
+        defer { isProcessing = false }
+        let audio = try recording.stop()
+        let result: TranscriptionResult
         do {
-            text = try transcription.transcribe(audio: audio, language: language)
+            result = try await transcription.transcribe(audio: audio)
         } catch {
             notifyInferenceFailure()
             throw error
         }
-
-        // ---------------------------------------------------------
-        // Discard blank input without changing nonempty transcription.
-        // ---------------------------------------------------------
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            lastResult = .discarded
             return .discarded
         }
+        guard let code = result.languageCode else {
+            notifyInferenceFailure()
+            throw VoiceTypingError.invalidLanguage
+        }
+        guard let language = Language(rawValue: code) else {
+            lastResult = .unsupportedLanguage(code)
+            return .unsupportedLanguage(code)
+        }
 
         // ---------------------------------------------------------
-        // Read application context immediately before correction.
-        // Keep intermediate results local to this request.
+        // Only inference errors notify; delivery errors propagate unchanged.
         // ---------------------------------------------------------
-        let application = try clipboardPaste.currentApplicationBundleIdentifier()
-        // ---------------------------------------------------------
-        // Keep lookup and delivery errors outside inference handling.
-        // ---------------------------------------------------------
-        let correctedText: String
+        let corrected: String
         do {
-            correctedText = try textCorrection.correct(
-                text: text,
-                language: language,
-                applicationBundleIdentifier: application
-            )
+            corrected = try await textCorrection.correct(text: result.text, language: language)
+            guard !corrected.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw VoiceTypingError.invalidCorrection
+            }
         } catch {
             notifyInferenceFailure()
             throw error
         }
-        let pasted = try clipboardPaste.paste(text: correctedText)
-        return pasted ? .pasted : .discarded
+        let outcome: ShortcutResult = try clipboardPaste.paste(text: corrected) ? .pasted : .discarded
+        lastResult = outcome
+        return outcome
     }
 }

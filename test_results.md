@@ -1,3 +1,55 @@
+# Native runtime integration result
+
+Automated verification on this Apple Silicon Mac: **23 tests passed, 0 failures**.
+This includes 21 flow/shortcut tests, a correction-prompt check, and the opt-in
+real-model integration test. All retained pre-existing behavior tests passed after
+async API migration; the obsolete application-lookup test was removed with that API.
+
+```sh
+TEST_RUNNER_VOICE_TYPING_MODEL_TESTS=1 \
+TEST_RUNNER_VOICE_TYPING_DOWNLOAD_MODELS=1 \
+TEST_RUNNER_VOICE_TYPING_TEST_AUDIO=/tmp/csci8700-speech.wav \
+xcodebuild test -project CSCI8700-Project.xcodeproj \
+  -scheme CSCI8700-Project -destination 'platform=macOS,arch=arm64' \
+  -derivedDataPath /tmp/csci8700-runtime-build
+```
+
+```text
+Real LFM correction: Please schedule the meeting for Tuesday, not Thursday.
+Real Whisper transcription: Please send the report tomorrow. en
+Executed 23 tests, with 0 failures (0 unexpected)
+** TEST SUCCEEDED **
+```
+
+The audio fixture was created locally using macOS `say -o` and converted using
+`afconvert` to mono float32 16 kHz. Real Silero detected silence and returned no
+transcription. Real Whisper transcribed the generated English speech and returned
+en; real LFM fixed “teh” without adding an explanation, preserving Tuesday/not
+Thursday. Real LFM also retained short thanks phrases in all ten supported languages.
+This checks short-text language preservation, not full multilingual speech quality.
+
+Earlier real-model runs exposed a missing chat-template asset and reasoning text
+leaking into the answer. Setup now includes the template and the LFM container
+uses always-on-thinking separation, returning only final answer chunks. The input
+is explicitly delimited transcription data, not a conversational request.
+
+The Xcode build/run also succeeded. The app window displayed the native controls
+and “Models loaded. Prepare permissions before recording.” Start recording was
+correctly disabled without permissions. Model files were downloaded into local
+Application Support; they are not part of the repository.
+
+**Still unverified:** actual microphone capture, actual editable-focus/Command-V
+insertion, global key events under granted permissions, macOS notification display,
+full ten-language spoken recordings, and physically disconnected-network operation.
+NATIVE-01–NATIVE-07 remain pending; AC-001 is not claimed as real-device complete.
+User permission setup is required before these native checks. See SETUP.md.
+
+Logs: `/tmp/csci8700-full-model-tests-fixed.log` (passing full run),
+`/tmp/csci8700-runtime-tests.log` (earlier 21-test unit run). Xcode successful launch
+log: `/var/folders/22/yg9k3vp95sng8yw7n9nf5pz00000gn/T/ActionArtifacts/default/RunProject/RunProject-Log-20261113-194737.txt`.
+
+---
+
 # Test results
 
 ## Slice 5 result

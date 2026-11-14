@@ -1,110 +1,80 @@
 # Test plan
 
-Source: `spec.md`, `architecture.md`, and the clarified requirements. No implementation inspected.
+Sources: spec.md, architecture.md, contracts.md, and the agreed native runtime plan.
+Automated dependency tests and actual model/OS checks are separate evidence.
+A passing mock inference test does not prove recognition/correction quality.
 
-“Status” means the desktop flow outcome, not an HTTP code. “Body” means returned text or field content; no response fields or error codes are specified. Expected values are derived manually. Exact model wording is unspecified; check meaning and required corrections.
+## Acceptance criterion
 
-## Acceptance criteria
+| ID | Requirements | Expected flow |
+|---|---|---|
+| AC-001 | FR-001–FR-003 | With local models/permissions ready and an editable field selected, Control double-tap starts real capture; another stops it. Local transcription precedes actual LFM correction; clipboard and Command-V deliver corrected text while preserving meaning. |
 
-| ID | Requirement | Cases (request/call; expected status; expected body fields; expected side effects) | Inside/outside | Control |
-|---|---|---|---|---|
-| AC-001 | FR-001, FR-002, FR-003; Description | With models and permissions ready and editable field A selected, double-tap Control, say “Please send teh report tomorrow,” then double-tap Control again. **Status:** recording starts, stops, and delivery completes. **Body:** “the” is spelled correctly; the request and tomorrow are preserved. **Side effects:** local transcription precedes local correction; the system clipboard and paste command deliver corrected text to A without manual paste. | No numeric limit is specified. Model readiness and permissions are setup preconditions. | No rejection in AC-001; this is the successful baseline. |
+`test_AC001` checks module coordination through injected boundaries and the registered
+async shortcut handler. Actual voice/model/field behavior needs NATIVE-01 below.
+The historical written “teh” fixture validates correction forwarding, not how a
+spoken misspelling would be recognized. Real tests use meaning/correction checks.
 
-## Extra cases from the gap checklist
+## Automated behavior tests
 
-These are additional probes, not acceptance criteria.
+- Normal flow: capture ordering, real handler invocation, transcription forwarding,
+  detected-language forwarding, correction result delivery, and no failure notification.
+- Blank transcription: empty, spaces, tabs, newlines, mixed and Unicode whitespace
+  skip correction/focus/clipboard/paste/notification; nonblank text remains unchanged.
+- Inference failures: one notification, original error propagation, audio release,
+  no delivery/retained pending text, and a fresh successful run afterward.
+- Delivery: final selected field, absent selection, focus/clipboard/posting failures,
+  no automatic retry or inference notification, and fresh capture after failure.
+  Do not require clipboard rollback after a failed paste command.
+- Language: all ten supported codes are forwarded with original-language text.
+  Unsupported codes discard before correction/paste; missing detected language on
+  nonblank transcription notifies as inference failure.
+- Invalid correction: blank output notifies and does not paste. Actual model output
+  reaching the generation cap is a failure, not a partial success.
+- Processing: a shortcut during suspended inference returns busy without new capture.
+- Shortcut recognition: two clean Control taps within 0.3 seconds, cancellation by
+  other keys/modifiers, no action for a third tap alone, and timeout boundaries.
+- Correction prompt: identical minimal-correction instruction regardless of destination;
+  preserve names, numbers, negation, dates, language, and meaning. No app ID interface exists.
 
-| ID | Requirement | Cases (request/call; expected status; expected body fields; expected side effects) | Inside/outside | Control |
-|---|---|---|---|---|
-| extra—boundaries / input types | FR-005 | Repeat AC-001 with English “Thank you,” Arabic “شكراً,” Chinese “谢谢,” French “Merci,” German “Danke,” Italian “Grazie,” Japanese “ありがとうございます,” Korean “감사합니다,” Portuguese “Obrigado,” and Spanish “Gracias.” **Status:** delivered. **Body:** thanks in the original language. **Side effects:** local processing and paste into A. | Inside: all 10 languages. Outside: Russian “Спасибо”; no outcome is specified, so no rejection is assumed. No duration or size limits are defined. | No specified rejection. |
-| extra—meaning / returned text | FR-002, FR-004 | Correct “Please schedule the meeting for Tuesday, not Thursday” and paste it into two different applications. **Status:** delivered. **Body:** Tuesday remains the requested day, Thursday is not selected, and the original language is preserved. **Side effects:** the same correction rules are used for both destinations. | No destination-specific correction rules. | Use identical text, language, model state, and generation settings; verify the same correction prompt is used. |
-| extra—identity / time | FR-006 | Start in A, select B before stopping, then select C before paste. **Status:** delivered. **Body:** corrected sentence in C. **Side effects:** A and B unchanged. | Select B just before stopping and C just after stopping, before paste; C is the destination. No numeric timing threshold is specified. | Keep B selected through paste; B receives the text. |
-| extra—state | FR-003, FR-006 | Stop with no editable field selected. **Status:** discarded. **Body:** no inserted text. **Side effects:** no clipboard write or paste command; no recording or text result retained for retry. Selecting A and double-tapping Control starts a new recording rather than delivering old text. Separately, make the paste command fail with a field selected: delivery throws and undelivered text is discarded without retry. | Editable selection present/absent; paste command succeeds/fails. A failed paste may already have written the clipboard. | For each case, change only selection availability or paste-command success; delivery succeeds with the same text. For failure, verify no new field content or retained result is created; do not assume clipboard rollback. |
-| extra—errors | FR-007 | Separately make transcription inference fail and correction inference fail during the baseline flow. **Status:** failure is reported by throwing. **Body:** no inserted text; no specified error code. **Side effects:** macOS notification; recording and intermediate text discarded; no clipboard write, paste, retained result, or new field content. | Each run has exactly one failing inference stage. | Adjacent successful run changes only the failing inference dependency to success; the baseline text is delivered. |
-| extra—silent / non-speech input | FR-008 | Record silence, then separately non-speech sound, and stop with a Control double-tap. **Status:** recording ends; result discarded. **Body:** no text. **Side effects:** no correction, clipboard write, paste, notification, or retained recording/text. | Speech versus silence/non-speech; no loudness or duration threshold is specified. | Same setup with the AC-001 sentence succeeds. |
+## Opt-in real-model checks
 
-Checklist: readiness and permission failures, concurrency, and error precedence involving simultaneous failures are outside scope. No listing operation is required. Timing, state, identity, input types, errors, and returned text are covered above.
+`LocalModelIntegrationTests.test_realLocalModels` runs only when
+`VOICE_TYPING_MODEL_TESTS=1` is passed to the test process. Add
+`VOICE_TYPING_DOWNLOAD_MODELS=1` for explicit initial setup; otherwise loading is
+local-only. `VOICE_TYPING_TEST_AUDIO` supplies a mono float32 16 kHz WAV fixture.
+For xcodebuild, prefix these environment names with `TEST_RUNNER_` so they reach
+the test host. Synthesized speech tests model integration, not microphone capture.
 
-## Selected speech model validation
+Models: `mlx-community/whisper-large-v3-turbo-4bit`, local Silero VAD
+(`mlx-community/silero-vad`), and `LiquidAI/LFM2.5-2.6B-MLX` `4bit/`.
+Check silent audio returns empty text/no language before Whisper; known English
+speech yields text and en; LFM repairs a typo while preserving Tuesday/not Thursday.
+Precision and model selection are fixed; model revisions need not be pinned.
 
-Production speech recognition uses
-[`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
-(MLX Whisper Large v3 Turbo, 4-bit quantization; spec Technical Constraints).
-After model files and permissions are prepared during setup, verify that runtime
-loads this model locally and performs transcription without sending audio or
-text to external servers. Record validation results.
+For full FR-005 acceptance, use real recordings in English, Arabic, Chinese,
+French, German, Italian, Japanese, Korean, Portuguese, and Spanish. Check detected
+language and corrected meaning in each. Preserve names/numbers/negation/dates;
+exact model wording is not specified. Do not label ten-language quality validated
+merely because injected-code forwarding passed.
 
-Run AC-001 and the ten-language and silence/non-speech probes above with actual
-recordings and the selected speech model. Verify that supported-language speech
-is transcribed in its original language and silence/non-speech yields an empty
-transcription with no downstream work. Check meaning rather than exact model
-wording. Full-flow validation also requires the selected local correction LLM
-described below.
+## Native application checks
 
-These are planned integration checks, not passing test results. The current
-injected-closure tests do not load the model or establish speech-recognition quality.
-Speech detection uses local [Silero VAD](https://github.com/snakers4/silero-vad)
-inside Transcription. Verify silence/non-speech returns an empty string without
-Whisper inference, while speech proceeds to Whisper. The inference library,
-Swift integration, VAD runtime, and detection settings remain to be decided;
-no thresholds or quality scores are specified here.
+Initial setup must prepare all model/tokenizer files and microphone, Accessibility,
+Input Monitoring/event posting, and notification permissions. Runtime readiness
+failure recovery and concurrent inference remain outside the product scope.
+No LLM identity stub is used. No application identifiers are acquired.
 
-## Selected correction model validation
-
-Production text correction uses
-[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
-locally through MLX using its `4bit/` variant (spec Technical Constraints).
-Verify the selected precision and record the correction
-prompt before real-model validation.
-Prepare model files during setup and verify runtime correction sends no audio
-or text to external servers.
-
-Run AC-001 and the ten-language, meaning/application-independence, and inference-failure probes
-with the actual correction model. Verify spelling/wording correction, preserved
-meaning and language, application-independent correction, and notification/discard on
-correction failure. Exact generated wording is not fixed. Model selection alone
-does not establish ten-language support or correction quality. Verify the same correction prompt is used for every paste destination.
-These checks are planned, not executed; current fixed-result tests do not load
-the LLM. Development-stage slices 7–8 below continue to defer LLM integration.
-
-## Development-stage real-device checks (no LLM)
-
-These checks cover slices 7–8, not final product acceptance. Slice 7 uses app
-buttons and shows the transcript. Slice 8 uses the existing VoiceTypingFlow and
-TextCorrection module with a development-only inference closure that returns
-the input unchanged, then delivers through real ClipboardPaste dependencies.
-No LLM is loaded; spelling/wording correction remains incomplete. Keep AC-001 unchanged; align existing interface tests with the revised contracts; passing these
-checks does not establish AC-001 or ten-language support.
-
-Prepare model files and required permissions during setup. Use English initially
-and the specified `mlx-community/whisper-large-v3-turbo-4bit` model locally.
-For delivery checks, use TextEdit fields/documents as destinations and prepare
-clipboard/field contents whose changes can be observed. Verify actual destination
-content as well as flow results; `.pasted` alone only confirms command completion.
-
-| ID | Slice | Procedure and expected result | Status |
+| ID | Procedure | Expected result | Status |
 |---|---|---|---|
-| DEV-7-01 | 7 | Start/stop real microphone capture using app buttons. Verify the specified local model transcribes the recording and the result appears in the app. Check that runtime sends no audio or text to external servers. | not run |
-| DEV-7-02 | 7 | Record two different sentences in succession. Each run displays its own transcription, without reusing earlier audio/text, and the UI remains usable during inference. | not run |
-| DEV-8-01 | 8 | With an editable field selected, double-tap Control to start capture, speak, and double-tap again to stop. Verify automatic clipboard/paste delivery. Inspect the development TextCorrection input/output and confirm exact equality; inserted text matches the transcription without LLM changes. | not run |
-| DEV-8-02 | 8 | Start in field A, select B before stopping, then C before paste. Verify only C receives the transcription. Repeat keeping B selected; only B receives it. | not run |
-| DEV-8-03 | 8 | Finish with no editable field selected. Verify discard, unchanged clipboard, and no paste command. Select a field and invoke the shortcut: fresh capture starts, and no previous text is delivered. | not run |
-| DEV-8-04 | 8 | Record silence and non-speech separately. Verify Silero VAD detects no speech, Whisper is not invoked, and an empty transcription is discarded with no TextCorrection, clipboard, paste, or notification call. Repeat with speech as a successful control. | not run |
-| DEV-8-05 | 8 | Make transcription inference fail in a controlled run. Verify exactly one actual macOS notification, propagated failure, no clipboard/field change, and discarded audio/intermediate text. Restore inference and verify a fresh recording succeeds without retrying old text. | not run |
-| DEV-8-06 | 8 | Exercise focus inspection, clipboard write, and paste-command failures separately through the delivery dependency boundary. Verify original failure propagation, no inference notification, no automatic retry, and fresh capture afterward. A failed paste may already have written the clipboard; do not require rollback or delivery confirmation from the destination. | not run |
-| DEV-8-07 | 8 | Run the existing automated suite: all retained tests must pass after aligning the tests with the revised contracts, including the original correction-path AC-001 test. Keep development identity correction out of the existing test configuration. | not run |
+| NATIVE-01 | Prepare, select a TextEdit field, double-tap Control, speak, double-tap again. | Real capture → local Silero/Whisper auto language → LFM minimal correction → clipboard/Command-V; verify actual inserted content. | not run |
+| NATIVE-02 | Repeat different sentences; inspect UI during model loading/inference and try the shortcut during processing. | UI stays responsive; no overlapping recording; fresh input on each completed request. | not run |
+| NATIVE-03 | Start in A, select B before stopping, then C before delivery. Also repeat with B unchanged. | Only the field selected at paste time receives text. | not run |
+| NATIVE-04 | Stop with no editable field selected, then select a field and start another request. | First request discards without clipboard/paste; second starts capture rather than replaying old text. | not run |
+| NATIVE-05 | Record silence and non-speech separately; use speech as the control. | Silero skips Whisper for no speech; no correction/clipboard/paste/notification; speech proceeds. | not run |
+| NATIVE-06 | Exercise transcription/correction errors separately and delivery failures separately. | Inference failure notifies once, discards and rethrows; delivery failures do not produce inference notifications. No retry; fresh successful capture works afterward. Record injected versus actual failures. | not run |
+| NATIVE-07 | After all assets are prepared, disconnect networking and relaunch; repeat successful speech and all ten-language probes. | Local loading/inference works without requests to model servers or audio/text transmission. Unsupported language discards with UI status. | not run |
 
-Record setup, observed outcomes, and whether a failure was injected
-or arose from an actual OS operation. These checks are not new XCTest method names.
-They are planned and unexecuted; failure-injection mechanics and inference/OS
-integration details must be settled before implementation. Final correction,
-application-independence, and ten-language checks above remain required for the complete application.
-
-## Spec gaps
-
-| Gap | Unresolved detail |
-|---|---|
-| Requirements with no acceptance criterion | FR-004–FR-008. AC-001 does not explicitly test unnatural wording or meaning preservation. |
-| Unspecified test values | Exact generated wording is not fixed; check minimal corrections and preserved meaning/language. Use the same correction rules and prompts for every paste destination. |
-
-Missing AC/NFR references are excluded from this review. No requirements are inferred from unsupported languages or absent listing features.
+Record actual observations in test_results.md. `.pasted` means events were posted,
+not that a destination inserted text. Native focus/paste coverage is verified only
+for tested fields/applications; no universal application compatibility is assumed.

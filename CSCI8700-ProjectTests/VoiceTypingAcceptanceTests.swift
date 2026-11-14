@@ -2,565 +2,333 @@ import AVFoundation
 import XCTest
 @testable import CSCI8700_Project
 
+// ---------------------------------------------------------
+// Observe the real module flow through replaceable OS/inference boundaries.
+// No model, microphone, clipboard, or permission prompt is used here.
+// ---------------------------------------------------------
+@MainActor
+private final class FlowFixture {
+    var events: [String] = []
+    var transcript = "Please send teh report tomorrow."
+    var languageCode: String? = "en"
+    var correction = "Please send the report tomorrow."
+    var receivedLanguage: Language?
+    var receivedText: String?
+    var clipboard = "Existing clipboard"
+    var delivered: [String] = []
+    var selection: String? = "A"
+    var destination: String?
+    var changeSelection: (() -> Void)?
+    var failureStage: String?
+    var inference: (() async throws -> TranscriptionResult)?
+    var captures = 0
+    var handler: (() async throws -> Void)?
+    var registered: [String] = []
+    let failure = NSError(domain: "FlowTests", code: 1)
+    var flow: VoiceTypingFlow!
+    weak var audio: AVAudioPCMBuffer?
+
+    init() throws {
+        let recording = try Recording(startCapture: {
+            self.events.append("start")
+            if self.failureStage == "start" { throw self.failure }
+            self.captures += 1
+        }, stopCapture: {
+            self.events.append("stop")
+            if self.failureStage == "stop" { throw self.failure }
+            let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1))
+            let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
+            buffer.frameLength = 1
+            buffer.floatChannelData?[0][0] = 0
+            self.audio = buffer
+            return buffer
+        })
+        let transcription = try Transcription(localInference: { audio in
+            self.events.append("transcribe")
+            XCTAssertTrue(audio === self.audio)
+            if self.failureStage == "transcribe" { throw self.failure }
+            if let inference = self.inference { return try await inference() }
+            return TranscriptionResult(text: self.transcript, languageCode: self.languageCode)
+        })
+        let correction = try TextCorrection(localInference: { text, language in
+            self.events.append("correct")
+            self.receivedText = text
+            self.receivedLanguage = language
+            if self.failureStage == "correct" { throw self.failure }
+            self.changeSelection?()
+            return self.correction
+        })
+        let paste = try ClipboardPaste(hasEditableSelection: {
+            self.events.append("focus")
+            if self.failureStage == "focus" { throw self.failure }
+            return self.selection != nil
+        }, writeClipboard: { text in
+            self.events.append("clipboard")
+            if self.failureStage == "clipboard" { throw self.failure }
+            self.clipboard = text
+        }, sendPasteCommand: {
+            self.events.append("paste")
+            if self.failureStage == "paste" { throw self.failure }
+            self.destination = self.selection
+            self.delivered.append(self.clipboard)
+        })
+        flow = try VoiceTypingFlow(
+            recording: recording, transcription: transcription, textCorrection: correction,
+            clipboardPaste: paste, shortcut: "control-double-tap",
+            registerShortcut: { name, handler in
+                self.registered.append(name)
+                self.handler = handler
+            }, notifyInferenceFailure: { self.events.append("notify") }
+        )
+    }
+
+    func run() async throws -> ShortcutResult {
+        let started = try await flow.handleShortcut()
+        XCTAssertEqual(started, .recordingStarted)
+        return try await flow.handleShortcut()
+    }
+}
+
 final class VoiceTypingAcceptanceTests: XCTestCase {
     @MainActor
-    func test_FR006_discardsRejectedDeliveryWithoutRetry() throws -> Void {
-        try checkUndeliveredText(
-            at: "selection", events: ["start", "stop", "transcribe", "correct", "focus"]
-        )
+    func test_AC001() async throws -> Void {
+        let f = try FlowFixture()
+        XCTAssertEqual(f.registered, ["control-double-tap"])
+        XCTAssertNotNil(f.handler)
+        try await f.handler?()
+        XCTAssertEqual(f.flow.lastResult, .recordingStarted)
+        XCTAssertEqual(f.events, ["start"])
+        try await f.handler?()
+        XCTAssertEqual(f.flow.lastResult, .pasted)
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
+        XCTAssertEqual(f.receivedText, f.transcript)
+        XCTAssertEqual(f.receivedLanguage, .english)
+        XCTAssertEqual(f.delivered, [f.correction])
     }
 
     @MainActor
-    func test_FR006_discardsTextAfterFocusFailureWithoutRetry() throws -> Void {
-        try checkUndeliveredText(
-            at: "focus", events: ["start", "stop", "transcribe", "correct", "focus"]
-        )
+    func test_FR008_discardsEmptyTranscription() async throws -> Void {
+        try await checkBlank("")
     }
 
     @MainActor
-    func test_FR006_discardsTextAfterClipboardFailureWithoutRetry() throws -> Void {
-        try checkUndeliveredText(
-            at: "clipboard", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard"]
-        )
+    func test_FR008_discardsWhitespaceOnlyTranscription() async throws -> Void {
+        for text in [" ", "\t", "\n", " \t\r\n", "\u{3000}\u{00A0}"] { try await checkBlank(text) }
     }
 
     @MainActor
-    func test_FR006_discardsTextAfterPasteFailureWithoutRetry() throws -> Void {
-        try checkUndeliveredText(
-            at: "paste", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"]
-        )
-    }
-
-    // ---------------------------------------------------------
-    // Reject or fail delivery once, then make the same dependency work.
-    // New capture must replace old text without retry or notification.
-    // ---------------------------------------------------------
-    @MainActor
-    private func checkUndeliveredText(at stage: String, events expectedEvents: [String]) throws -> Void {
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let failure = NSError(domain: "DeliveryTests", code: 1)
-        var shouldFail = true
-        var captures = 0
-        var events: [String] = []
-        weak var capturedAudio: AVAudioPCMBuffer?
-        var clipboard = "Existing clipboard"
-        var field = "Existing field"
-        let recording = try Recording(
-            startCapture: {
-                events.append("start")
-                captures += 1
-            },
-            stopCapture: {
-                events.append("stop")
-                let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
-                capturedAudio = audio
-                return audio
-            }
-        )
-        let transcription = try Transcription(localInference: { audio, _ in
-            events.append("transcribe")
-            XCTAssertTrue(audio === capturedAudio)
-            return captures == 1 ? "Old transcript" : "Fresh transcript"
-        })
-        let correction = try TextCorrection(localInference: { text, _, _ in
-            events.append("correct")
-            XCTAssertEqual(text, captures == 1 ? "Old transcript" : "Fresh transcript")
-            return captures == 1 ? "Old correction" : "Fresh correction"
-        })
-        let paste = try ClipboardPaste(
-            activeApplication: { "com.apple.TextEdit" },
-            hasEditableSelection: {
-                events.append("focus")
-                if shouldFail && stage == "focus" { throw failure }
-                return !(shouldFail && stage == "selection")
-            },
-            writeClipboard: { text in
-                events.append("clipboard")
-                if shouldFail && stage == "clipboard" { throw failure }
-                clipboard = text
-            },
-            sendPasteCommand: {
-                events.append("paste")
-                if shouldFail && stage == "paste" { throw failure }
-                field += clipboard
-            }
-        )
-        let flow = try VoiceTypingFlow(
-            recording: recording, transcription: transcription, textCorrection: correction,
-            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
-            registerShortcut: { _, _ in },
-            notifyInferenceFailure: { events.append("notify") }
-        )
-
-        // ---------------------------------------------------------
-        // No field change occurs; a paste failure may leave clipboard text.
-        // Audio must be released after the rejected or throwing request.
-        // ---------------------------------------------------------
-        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-        if stage == "selection" {
-            XCTAssertEqual(try flow.handleShortcut(), .discarded)
-        } else {
-            XCTAssertThrowsError(try flow.handleShortcut()) { error in
-                XCTAssertTrue((error as NSError) === failure)
-            }
-        }
-        XCTAssertEqual(events, expectedEvents)
-        XCTAssertEqual(field, "Existing field")
-        XCTAssertEqual(clipboard, stage == "paste" ? "Old correction" : "Existing clipboard")
-        XCTAssertNil(capturedAudio)
-
-        // ---------------------------------------------------------
-        // Restoring delivery alone must not send pending text.
-        // Only a fresh recording can produce the next field change.
-        // ---------------------------------------------------------
-        shouldFail = false
-        events.removeAll()
-        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-        XCTAssertEqual(events, ["start"])
-        XCTAssertEqual(field, "Existing field")
-        XCTAssertEqual(try flow.handleShortcut(), .pasted)
-        XCTAssertEqual(events, ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
-        XCTAssertEqual(captures, 2)
-        XCTAssertEqual(field, "Existing fieldFresh correction")
-        XCTAssertEqual(clipboard, "Fresh correction")
-        XCTAssertNil(capturedAudio)
+    private func checkBlank(_ text: String) async throws -> Void {
+        let f = try FlowFixture()
+        f.transcript = text
+        f.languageCode = nil
+        let result = try await f.run()
+        XCTAssertEqual(result, .discarded)
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe"])
+        XCTAssertEqual(f.clipboard, "Existing clipboard")
+        XCTAssertTrue(f.delivered.isEmpty)
+        XCTAssertNil(f.audio)
     }
 
     @MainActor
-    func test_FR006_pastesIntoSelectionChangedBeforePaste() throws -> Void {
-        try checkPasteSelection(destination: "C")
+    func test_FR008_startsFreshRecordingAfterDiscard() async throws -> Void {
+        let f = try FlowFixture()
+        f.transcript = ""
+        let discarded = try await f.run()
+        XCTAssertEqual(discarded, .discarded)
+        f.transcript = "Fresh text"
+        f.correction = "Fresh text."
+        let pasted = try await f.run()
+        XCTAssertEqual(pasted, .pasted)
+        XCTAssertEqual(f.captures, 2)
+        XCTAssertEqual(f.delivered, ["Fresh text."])
     }
 
     @MainActor
-    func test_FR006_pastesIntoUnchangedSelection() throws -> Void {
-        try checkPasteSelection(destination: "B")
+    func test_FR008_preservesNonemptyTranscription() async throws -> Void {
+        let f = try FlowFixture()
+        f.transcript = " \tThank you.\n"
+        _ = try await f.run()
+        XCTAssertEqual(f.receivedText, f.transcript)
     }
 
     @MainActor
-    func test_FR006_skipsClipboardAndPasteWithoutEditableSelection() throws -> Void {
-        try checkPasteSelection(destination: nil)
-    }
-
-    // ---------------------------------------------------------
-    // Start in A, stop in B, then set the selection during correction.
-    // The simulated paste command writes only to the selected field.
-    // ---------------------------------------------------------
-    @MainActor
-    private func checkPasteSelection(destination: String?) throws -> Void {
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
-        var selection: String? = "A"
-        var fields = ["A": "", "B": "", "C": ""]
-        var clipboard = "Existing clipboard"
-        var events: [String] = []
-        let recording = try Recording(
-            startCapture: { events.append("start") },
-            stopCapture: {
-                events.append("stop")
-                return audio
-            }
-        )
-        let transcription = try Transcription(localInference: { _, _ in
-            events.append("transcribe")
-            return "Please send teh report."
-        })
-        let correction = try TextCorrection(localInference: { _, _, application in
-            events.append("correct")
-            XCTAssertEqual(application, "B")
-            selection = destination
-            return "Please send the report."
-        })
-        let paste = try ClipboardPaste(
-            activeApplication: {
-                events.append("application")
-                return selection
-            },
-            hasEditableSelection: {
-                events.append("focus")
-                return selection != nil
-            },
-            writeClipboard: { text in
-                events.append("clipboard")
-                clipboard = text
-            },
-            sendPasteCommand: {
-                events.append("paste")
-                let field = try XCTUnwrap(selection)
-                fields[field] = clipboard
-            }
-        )
-        let flow = try VoiceTypingFlow(
-            recording: recording, transcription: transcription, textCorrection: correction,
-            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
-            registerShortcut: { _, _ in },
-            notifyInferenceFailure: { events.append("notify") }
-        )
-
-        // ---------------------------------------------------------
-        // Application context does not fix the eventual delivery field.
-        // ---------------------------------------------------------
-        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-        selection = "B"
-        XCTAssertEqual(try flow.handleShortcut(), destination == nil ? .discarded : .pasted)
-        var expectedFields = ["A": "", "B": "", "C": ""]
-        var expectedEvents = ["start", "stop", "transcribe", "application", "correct", "focus"]
-        if let destination {
-            expectedFields[destination] = "Please send the report."
-            expectedEvents += ["clipboard", "paste"]
-        }
-        XCTAssertEqual(fields, expectedFields)
-        XCTAssertEqual(events, expectedEvents)
-        XCTAssertEqual(clipboard, destination == nil ? "Existing clipboard" : "Please send the report.")
+    func test_FR007_notifiesOnTranscriptionFailureAndRecovers() async throws -> Void {
+        try await checkFailure("transcribe", events: ["start", "stop", "transcribe", "notify"])
     }
 
     @MainActor
-    func test_FR007_notifiesOnTranscriptionFailureAndRecovers() throws -> Void {
-        try checkFailure(
-            at: "transcribe",
-            events: ["start", "stop", "transcribe", "notify"]
-        )
+    func test_FR007_notifiesOnCorrectionFailureAndRecovers() async throws -> Void {
+        try await checkFailure("correct", events: ["start", "stop", "transcribe", "correct", "notify"])
     }
 
     @MainActor
-    func test_FR007_notifiesOnCorrectionFailureAndRecovers() throws -> Void {
-        try checkFailure(
-            at: "correct",
-            events: ["start", "stop", "transcribe", "application", "correct", "notify"]
-        )
+    func test_FR007_doesNotNotifyOnPasteFailure() async throws -> Void {
+        try await checkFailure("paste", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
     }
 
     @MainActor
-    func test_FR007_doesNotNotifyOnApplicationLookupFailure() throws -> Void {
-        try checkFailure(
-            at: "application",
-            events: ["start", "stop", "transcribe", "application"]
-        )
-    }
-
-    @MainActor
-    func test_FR007_doesNotNotifyOnPasteFailure() throws -> Void {
-        try checkFailure(
-            at: "paste",
-            events: ["start", "stop", "transcribe", "application", "correct", "focus", "clipboard", "paste"]
-        )
-    }
-
-    // ---------------------------------------------------------
-    // Fail one dependency, then change only that failure to success.
-    // Observe notifications, original errors, audio release, and recovery.
-    // ---------------------------------------------------------
-    @MainActor
-    private func checkFailure(at stage: String, events expectedEvents: [String]) throws -> Void {
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let failure = NSError(domain: "VoiceTypingTests", code: 1)
-        var shouldFail = true
-        var events: [String] = []
-        var captures = 0
-        weak var capturedAudio: AVAudioPCMBuffer?
-        var clipboard = "Existing clipboard"
-        var delivered: [String] = []
-        let recording = try Recording(
-            startCapture: {
-                events.append("start")
-                captures += 1
-            },
-            stopCapture: {
-                events.append("stop")
-                let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
-                capturedAudio = audio
-                return audio
-            }
-        )
-        let transcription = try Transcription(localInference: { audio, _ in
-            events.append("transcribe")
-            XCTAssertTrue(audio === capturedAudio)
-            if shouldFail && stage == "transcribe" { throw failure }
-            return captures == 1 ? "Old transcript" : "Fresh transcript"
-        })
-        let correction = try TextCorrection(localInference: { text, _, _ in
-            events.append("correct")
-            XCTAssertEqual(text, captures == 1 ? "Old transcript" : "Fresh transcript")
-            if shouldFail && stage == "correct" { throw failure }
-            return captures == 1 ? "Old correction" : "Fresh correction"
-        })
-        let paste = try ClipboardPaste(
-            activeApplication: {
-                events.append("application")
-                if shouldFail && stage == "application" { throw failure }
-                return "com.apple.TextEdit"
-            },
-            hasEditableSelection: {
-                events.append("focus")
-                return true
-            },
-            writeClipboard: { text in
-                events.append("clipboard")
-                clipboard = text
-            },
-            sendPasteCommand: {
-                events.append("paste")
-                if shouldFail && stage == "paste" { throw failure }
-                delivered.append(clipboard)
-            }
-        )
-        let flow = try VoiceTypingFlow(
-            recording: recording, transcription: transcription, textCorrection: correction,
-            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
-            registerShortcut: { _, _ in },
-            notifyInferenceFailure: { events.append("notify") }
-        )
-
-        // ---------------------------------------------------------
-        // A failed inference must not reach delivery or retain audio.
-        // A failed paste may already have written the clipboard.
-        // ---------------------------------------------------------
-        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-        XCTAssertThrowsError(try flow.handleShortcut()) { error in
-            XCTAssertTrue((error as NSError) === failure)
-        }
-        XCTAssertEqual(events, expectedEvents)
-        XCTAssertNil(capturedAudio)
-        XCTAssertTrue(delivered.isEmpty)
-        XCTAssertEqual(clipboard, stage == "paste" ? "Old correction" : "Existing clipboard")
-
-        // ---------------------------------------------------------
-        // A new shortcut records fresh input instead of retrying old text.
-        // ---------------------------------------------------------
-        shouldFail = false
-        events.removeAll()
-        XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-        XCTAssertEqual(events, ["start"])
-        XCTAssertEqual(try flow.handleShortcut(), .pasted)
-        XCTAssertEqual(events, ["start", "stop", "transcribe", "application", "correct", "focus", "clipboard", "paste"])
-        XCTAssertEqual(captures, 2)
-        XCTAssertEqual(delivered, ["Fresh correction"])
-        XCTAssertEqual(clipboard, "Fresh correction")
-        XCTAssertNil(capturedAudio)
-    }
-
-    @MainActor
-    func test_FR008_discardsEmptyTranscription() throws -> Void {
-        try checkTranscriptions(
-            [""], results: [.discarded],
-            events: ["start", "stop", "transcribe"], delivered: []
-        )
-    }
-
-    @MainActor
-    func test_FR008_discardsWhitespaceOnlyTranscription() throws -> Void {
-        for text in [" ", "\t", "\n", " \t\r\n", "\u{3000}\u{00A0}"] {
-            try checkTranscriptions(
-                [text], results: [.discarded],
-                events: ["start", "stop", "transcribe"], delivered: []
-            )
-        }
-    }
-
-    @MainActor
-    func test_FR008_startsFreshRecordingAfterDiscard() throws -> Void {
-        try checkTranscriptions(
-            ["", "Thank you."], results: [.discarded, .pasted],
-            events: [
-                "start", "stop", "transcribe",
-                "start", "stop", "transcribe", "application", "correct", "focus", "clipboard", "paste"
-            ],
-            delivered: ["Thank you."]
-        )
-    }
-
-    @MainActor
-    func test_FR008_preservesNonemptyTranscription() throws -> Void {
-        try checkTranscriptions(
-            [" \tThank you.\n"], results: [.pasted],
-            events: ["start", "stop", "transcribe", "application", "correct", "focus", "clipboard", "paste"],
-            delivered: [" \tThank you.\n"]
-        )
-    }
-
-    // ---------------------------------------------------------
-    // Observe the complete flow with injected inference and delivery.
-    // Each recording receives a distinct buffer to check fresh capture.
-    // ---------------------------------------------------------
-    @MainActor
-    private func checkTranscriptions(
-        _ transcripts: [String],
-        results: [ShortcutResult],
-        events expectedEvents: [String],
-        delivered expectedDelivered: [String]
-    ) throws -> Void {
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let buffers = try transcripts.map { _ in
-            try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
-        }
-        var index = 0
-        var events: [String] = []
-        var correctedInputs: [String] = []
-        var clipboard = "Existing clipboard"
-        var delivered: [String] = []
-        let recording = try Recording(
-            startCapture: { events.append("start") },
-            stopCapture: {
-                events.append("stop")
-                return buffers[index]
-            }
-        )
-        let transcription = try Transcription(localInference: { audio, _ in
-            events.append("transcribe")
-            XCTAssertTrue(audio === buffers[index])
-            let text = transcripts[index]
-            index += 1
-            return text
-        })
-        let correction = try TextCorrection(localInference: { text, _, _ in
-            events.append("correct")
-            correctedInputs.append(text)
-            return text
-        })
-        let paste = try ClipboardPaste(
-            activeApplication: {
-                events.append("application")
-                return "com.apple.TextEdit"
-            },
-            hasEditableSelection: {
-                events.append("focus")
-                return true
-            },
-            writeClipboard: { text in
-                events.append("clipboard")
-                clipboard = text
-            },
-            sendPasteCommand: {
-                events.append("paste")
-                delivered.append(clipboard)
-            }
-        )
-        let flow = try VoiceTypingFlow(
-            recording: recording, transcription: transcription, textCorrection: correction,
-            clipboardPaste: paste, language: .english, shortcut: "control-double-tap",
-            registerShortcut: { _, _ in },
-            notifyInferenceFailure: { events.append("notify") }
-        )
-
-        // ---------------------------------------------------------
-        // Verify all observable work, including no downstream effects.
-        // ---------------------------------------------------------
-        for result in results {
-            XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-            XCTAssertEqual(try flow.handleShortcut(), result)
-        }
-        XCTAssertEqual(events, expectedEvents)
-        XCTAssertEqual(index, transcripts.count)
-        XCTAssertEqual(correctedInputs, expectedDelivered)
-        XCTAssertEqual(delivered, expectedDelivered)
-        XCTAssertEqual(clipboard, expectedDelivered.last ?? "Existing clipboard")
-    }
-
-    @MainActor
-    func test_AC001() throws -> Void {
-        // ---------------------------------------------------------
-        // Use fixed local inference results and an editable field.
-        // This tests coordination, not model quality or macOS delivery.
-        // ---------------------------------------------------------
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
-        let audio = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1))
-        audio.frameLength = 1
-        audio.floatChannelData?[0][0] = 0
-        let transcript = "Please send teh report tomorrow."
-        let correctedText = "Please send the report tomorrow."
-        let application = "com.apple.TextEdit"
-        let shortcut = "control-double-tap"
-        var events: [String] = []
-        var clipboard: String?
-        var pastedText: String?
-        var registeredShortcuts: [String] = []
-        var registeredHandler: (() throws -> Void)?
-        var applicationLookups = 0
-        var failureNotifications = 0
-        var stage = "Recording initialization"
-
+    private func checkFailure(_ stage: String, events: [String]) async throws -> Void {
+        let f = try FlowFixture()
+        f.failureStage = stage
         do {
-            let recording = try Recording(
-                startCapture: { events.append("start") },
-                stopCapture: {
-                    events.append("stop")
-                    return audio
-                }
-            )
-            stage = "Transcription initialization"
-            let transcription = try Transcription(localInference: { receivedAudio, language in
-                events.append("transcribe")
-                XCTAssertTrue(receivedAudio === audio)
-                XCTAssertEqual(language, .english)
-                return transcript
-            })
-            stage = "TextCorrection initialization"
-            let correction = try TextCorrection(localInference: { text, language, bundleIdentifier in
-                events.append("correct")
-                XCTAssertEqual(text, transcript)
-                XCTAssertEqual(language, .english)
-                XCTAssertEqual(bundleIdentifier, application)
-                return correctedText
-            })
-            stage = "ClipboardPaste initialization"
-            let paste = try ClipboardPaste(
-                activeApplication: {
-                    applicationLookups += 1
-                    return application
-                },
-                hasEditableSelection: {
-                    events.append("focus")
-                    return true
-                },
-                writeClipboard: { text in
-                    events.append("clipboard")
-                    clipboard = text
-                },
-                sendPasteCommand: {
-                    events.append("paste")
-                    XCTAssertEqual(clipboard, correctedText)
-                    pastedText = clipboard
-                }
-            )
-            stage = "VoiceTypingFlow initialization"
-            let flow = try VoiceTypingFlow(
-                recording: recording,
-                transcription: transcription,
-                textCorrection: correction,
-                clipboardPaste: paste,
-                language: .english,
-                shortcut: shortcut,
-                registerShortcut: { value, handler in
-                    registeredShortcuts.append(value)
-                    registeredHandler = handler
-                },
-                notifyInferenceFailure: { failureNotifications += 1 }
-            )
+            _ = try await f.run()
+            XCTFail("Expected failure at \(stage)")
+        } catch { XCTAssertTrue((error as NSError) === f.failure) }
+        XCTAssertEqual(f.events, events)
+        XCTAssertNil(f.audio)
+        XCTAssertTrue(f.delivered.isEmpty)
+        XCTAssertEqual(f.clipboard, stage == "paste" ? f.correction : "Existing clipboard")
+        f.failureStage = nil
+        f.events = []
+        f.transcript = "Fresh transcript"
+        f.correction = "Fresh correction"
+        let start = try await f.flow.handleShortcut()
+        XCTAssertEqual(start, .recordingStarted)
+        XCTAssertEqual(f.events, ["start"])
+        let pasted = try await f.flow.handleShortcut()
+        XCTAssertEqual(pasted, .pasted)
+        XCTAssertEqual(f.delivered, ["Fresh correction"])
+        XCTAssertEqual(f.captures, 2)
+        XCTAssertNil(f.audio)
+    }
 
-            // ---------------------------------------------------------
-            // The first shortcut starts capture without producing text.
-            // ---------------------------------------------------------
-            XCTAssertEqual(registeredShortcuts, [shortcut])
-            XCTAssertNotNil(registeredHandler)
-            stage = "first handleShortcut()"
-            XCTAssertEqual(try flow.handleShortcut(), .recordingStarted)
-            XCTAssertEqual(events, ["start"])
-            XCTAssertNil(clipboard)
-            XCTAssertNil(pastedText)
-            XCTAssertEqual(failureNotifications, 0)
+    @MainActor
+    func test_FR006_pastesIntoSelectionChangedBeforePaste() async throws -> Void {
+        let f = try FlowFixture()
+        let started = try await f.flow.handleShortcut()
+        XCTAssertEqual(started, .recordingStarted)
+        f.selection = "B"
+        f.changeSelection = { f.selection = "C" }
+        let result = try await f.flow.handleShortcut()
+        XCTAssertEqual(result, .pasted)
+        XCTAssertEqual(f.destination, "C")
+    }
 
-            // ---------------------------------------------------------
-            // The second shortcut processes audio and delivers correction.
-            // AC-001 defines no rejection or error code to assert.
-            // ---------------------------------------------------------
-            stage = "second handleShortcut()"
-            XCTAssertEqual(try flow.handleShortcut(), .pasted)
-            XCTAssertEqual(events, ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
-            XCTAssertGreaterThanOrEqual(applicationLookups, 1)
-            XCTAssertEqual(clipboard, correctedText)
-            XCTAssertEqual(pastedText, correctedText)
-            XCTAssertEqual(failureNotifications, 0)
-        } catch {
-            XCTFail("AC-001 requires a successful flow; \(stage) threw \(error)")
+    @MainActor
+    func test_FR006_pastesIntoUnchangedSelection() async throws -> Void {
+        let f = try FlowFixture()
+        f.selection = "B"
+        _ = try await f.run()
+        XCTAssertEqual(f.destination, "B")
+    }
+
+    @MainActor
+    func test_FR006_skipsClipboardAndPasteWithoutEditableSelection() async throws -> Void {
+        let f = try FlowFixture()
+        f.selection = nil
+        let result = try await f.run()
+        XCTAssertEqual(result, .discarded)
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe", "correct", "focus"])
+        XCTAssertEqual(f.clipboard, "Existing clipboard")
+        XCTAssertTrue(f.delivered.isEmpty)
+    }
+
+    @MainActor
+    func test_FR006_discardsRejectedDeliveryWithoutRetry() async throws -> Void {
+        let f = try FlowFixture()
+        f.selection = nil
+        let discarded = try await f.run()
+        XCTAssertEqual(discarded, .discarded)
+        f.selection = "A"
+        f.events = []
+        f.correction = "New recording"
+        let start = try await f.flow.handleShortcut()
+        XCTAssertEqual(start, .recordingStarted)
+        XCTAssertEqual(f.events, ["start"])
+        XCTAssertTrue(f.delivered.isEmpty)
+        _ = try await f.flow.handleShortcut()
+        XCTAssertEqual(f.delivered, ["New recording"])
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterFocusFailureWithoutRetry() async throws -> Void {
+        try await checkFailure("focus", events: ["start", "stop", "transcribe", "correct", "focus"])
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterClipboardFailureWithoutRetry() async throws -> Void {
+        try await checkFailure("clipboard", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard"])
+    }
+
+    @MainActor
+    func test_FR006_discardsTextAfterPasteFailureWithoutRetry() async throws -> Void {
+        try await checkFailure("paste", events: ["start", "stop", "transcribe", "correct", "focus", "clipboard", "paste"])
+    }
+
+    @MainActor
+    func test_FR005_forwardsAllDetectedLanguages() async throws -> Void {
+        let texts: [(Language, String)] = [(.english, "Thank you"), (.arabic, "شكراً"), (.chinese, "谢谢"),
+            (.french, "Merci"), (.german, "Danke"), (.italian, "Grazie"), (.japanese, "ありがとうございます"),
+            (.korean, "감사합니다"), (.portuguese, "Obrigado"), (.spanish, "Gracias")]
+        XCTAssertEqual(Set(texts.map { $0.0 }), Set(Language.allCases))
+        for (language, text) in texts {
+            let f = try FlowFixture()
+            f.transcript = text
+            f.languageCode = language.rawValue
+            f.correction = text
+            let result = try await f.run()
+            XCTAssertEqual(result, .pasted)
+            XCTAssertEqual(f.receivedLanguage, language)
+            XCTAssertEqual(f.receivedText, text)
+            XCTAssertEqual(f.delivered, [text])
         }
+    }
+
+    @MainActor
+    func test_unsupportedLanguageIsDiscarded() async throws -> Void {
+        let f = try FlowFixture()
+        f.languageCode = "ru"
+        let result = try await f.run()
+        XCTAssertEqual(result, .unsupportedLanguage("ru"))
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe"])
+    }
+
+    @MainActor
+    func test_missingDetectedLanguageNotifies() async throws -> Void {
+        let f = try FlowFixture()
+        f.languageCode = nil
+        do { _ = try await f.run(); XCTFail("Expected missing language error") }
+        catch { XCTAssertEqual(error as? VoiceTypingError, .invalidLanguage) }
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe", "notify"])
+    }
+
+    @MainActor
+    func test_emptyCorrectionNotifiesWithoutDelivery() async throws -> Void {
+        let f = try FlowFixture()
+        f.correction = " \n"
+        do { _ = try await f.run(); XCTFail("Expected correction error") }
+        catch { XCTAssertEqual(error as? VoiceTypingError, .invalidCorrection) }
+        XCTAssertEqual(f.events, ["start", "stop", "transcribe", "correct", "notify"])
+    }
+
+    @MainActor
+    func test_shortcutsDuringInferenceAreIgnored() async throws -> Void {
+        let f = try FlowFixture()
+        var continuation: CheckedContinuation<TranscriptionResult, Never>?
+        f.inference = { await withCheckedContinuation { continuation = $0 } }
+        _ = try await f.flow.handleShortcut()
+        let task = Task { try await f.flow.handleShortcut() }
+        while continuation == nil { await Task.yield() }
+        let result = try await f.flow.handleShortcut()
+        XCTAssertEqual(result, .busy)
+        XCTAssertEqual(f.captures, 1)
+        continuation?.resume(returning: TranscriptionResult(text: f.transcript, languageCode: "en"))
+        let delivered = try await task.value
+        XCTAssertEqual(delivered, .pasted)
+    }
+
+    func test_controlDoubleTapRequiresTwoCleanTaps() -> Void {
+        var matcher = ControlTapMatcher()
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: true, timestamp: 1, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: false, timestamp: 1.01, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: true, timestamp: 1.1, keyEvent: false))
+        XCTAssertTrue(matcher.consume(keyCode: 59, controlOnly: false, timestamp: 1.2, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: true, timestamp: 1.25, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: false, timestamp: 1.26, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 1, controlOnly: false, timestamp: 1.27, keyEvent: true))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: true, timestamp: 1.28, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: false, timestamp: 1.29, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: true, timestamp: 2, keyEvent: false))
+        XCTAssertFalse(matcher.consume(keyCode: 59, controlOnly: false, timestamp: 2.1, keyEvent: false))
     }
 }
