@@ -4,8 +4,10 @@ These contracts match the Swift skeleton in `CSCI8700-Project/Modules/`.
 All module classes and protocols use `@MainActor`.
 Slice 1 implements dependency forwarding, shortcut registration, and the successful
 recording-to-paste flow. Application context is read immediately before correction.
-The tables describe the full intended behavior; empty-transcription handling and
-inference-failure notification remain for later slices. Real microphone, MLX, and
+Slice 2 discards transcription that is empty after trimming `.whitespacesAndNewlines`,
+without application lookup, correction, delivery, or notification. Nonempty text
+is forwarded unchanged. The tables describe the full intended behavior;
+inference-failure notification remains for a later slice. Real microphone, MLX, and
 macOS operations are not wired into the app yet.
 
 ## Methods
@@ -22,6 +24,8 @@ macOS operations are not wired into the app yet.
 
 `true` / `.pasted` means the paste command completed; it does not confirm that the destination application inserted the text.
 Error types are not specified. Inference failures follow FR-007; silent or non-speech audio follows FR-008.
+For VoiceTypingFlow, empty transcription includes whitespace/newline-only output.
+After discarding it, the next shortcut starts a fresh recording.
 
 ## Initializers and injected dependencies
 

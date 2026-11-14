@@ -15,13 +15,13 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
    Scope includes all five initializers, `Recording.start/stop`, `Transcription.transcribe`, `TextCorrection.correct`, `ClipboardPaste.currentApplicationBundleIdentifier/paste`, and `VoiceTypingFlow.handleShortcut`. Register the shortcut handler and alternate start/stop. Keep this first slice to the successful request flow.
 
 2. **Name:** Silent input.
-   **Goal:** Discard empty transcription without correction, delivery, notification, or retained data.
+   **Goal:** Discard empty or whitespace/newline-only transcription without application lookup, correction, delivery, notification, or retained data.
    **Spec sources:** spec Functional Requirements FR-008; architecture §3 step 2; contracts Transcription and VoiceTypingFlow Methods.
    **Criteria:** None; FR-008 has no acceptance criterion.
-   **Tests that should turn green:** None in the current suite.
+   **Tests that should turn green:** `test_FR008_discardsEmptyTranscription`, `test_FR008_discardsWhitespaceOnlyTranscription`, `test_FR008_startsFreshRecordingAfterDiscard`, `test_FR008_preservesNonemptyTranscription`.
    **Depends on:** 1.
-   **Done when:** The listed tests pass and no previously passing test fails; verify the silence/non-speech probe in test_plan “Extra cases” because automated coverage is absent.
-   **Status:** not started.
+   **Done when:** The listed tests pass and no previously passing test fails. Actual silence/non-speech detection requires real-model validation outside this slice.
+   **Status:** implemented; automated results recorded in test_results.md. Real audio detection remains unverified.
 
 3. **Name:** Inference failure cleanup.
    **Goal:** Notify once and discard recording and intermediate text when either inference stage throws, then propagate the failure.
@@ -61,7 +61,7 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Test issues
 
-- Only `test_AC001` exists. Later slices have no existing tests to turn green; their completion cannot be established by this suite alone.
+- The suite covers AC-001 coordination and Slice 2 blank-transcription behavior. Slices 3–6 have no existing tests to turn green; their completion cannot be established by this suite alone.
 - The test explicitly uses fixed inference results and simulated capture/paste. It checks coordination, not actual Control double-tap handling, MLX locality, model quality, or field insertion. Its zero-valued audio is a fixture, not a silence test.
 - The registered handler is checked for presence but never invoked. No contradiction with the spec was found; these are coverage gaps.
 - Application style and exact model output are unspecified, so exact style assertions cannot yet be derived.
@@ -75,8 +75,8 @@ Source references: architecture §1–§6; contracts “Methods,” “Initializ
 
 ## Coverage audit
 
-Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and its sole test are assigned only to slice 1.
+Unassigned acceptance criteria: none. Unassigned failing tests: none. AC-001 and `test_AC001` are assigned only to slice 1; the four FR-008 tests belong only to slice 2.
 
 Unfilled contracted functions/initializers: none; slice 1 covers every signature, and later slices extend their behavior. Real dependency composition and placeholder UI replacement remain unresolved under Design questions, outside the contracted module surface.
 
-Next action: Slice 2, Silent input — add coverage for empty transcription before implementing its discard behavior.
+Next action: Slice 3, Inference failure cleanup — add separate tests for transcription and correction failures.
