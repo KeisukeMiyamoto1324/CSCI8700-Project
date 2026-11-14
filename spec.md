@@ -58,7 +58,14 @@ Speech recognition shall use the 4-bit quantized MLX model
 [`mlx-community/whisper-large-v3-turbo-4bit`](https://huggingface.co/mlx-community/whisper-large-v3-turbo-4bit)
 (Whisper Large v3 Turbo), running locally on Apple Silicon. Model files are
 prepared during initial setup; runtime transcription shall not send audio or
-text to external servers. The text-correction LLM is not yet specified.
+text to external servers.
+
+Text correction shall use
+[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
+locally through MLX using its `4bit/` variant (4-bit quantization). The model
+revision remains to be selected before integration. Model
+files are prepared during initial setup; runtime correction shall not send audio
+or text to external servers.
 
 # Scope
 

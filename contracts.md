@@ -30,6 +30,14 @@ Injected test closures may supply fixed results; they do not validate model use,
 accuracy, or silence detection. Existing signatures are unchanged, and the
 production model dependency is not connected yet.
 
+The production `TextCorrection.localInference` dependency shall use
+[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
+locally through MLX, with the existing text, language, and application-context
+arguments, using the repository's `4bit/` variant. Revision, prompt, and inference
+integration remain undecided.
+Model selection does not change any signature or complete model integration.
+Injected test closures do not establish correction quality or language coverage.
+
 | Module / signature | Success result and side effects | Failure | Spec rule |
 |---|---|---|---|
 | Recording: `start() throws -> Void` | Starts one microphone recording. | Throws on capture failure. | FR-001 |
@@ -55,7 +63,7 @@ The fixed shortcut is represented by the string `"control-double-tap"`.
 |---|---|---|---|
 | Recording | `init(startCapture: @escaping () throws -> Void, stopCapture: @escaping () throws -> AVAudioPCMBuffer) throws` | Microphone start and stop operations. | FR-001 |
 | Transcription | `init(localInference: @escaping (AVAudioPCMBuffer, Language) throws -> String) throws` | Local MLX speech inference using `mlx-community/whisper-large-v3-turbo-4bit` in production. | FR-001, FR-005; Technical Constraints |
-| TextCorrection | `init(localInference: @escaping (String, Language, String?) throws -> String) throws` | Local MLX text inference with application context. | FR-002, FR-004, FR-005 |
+| TextCorrection | `init(localInference: @escaping (String, Language, String?) throws -> String) throws` | Local MLX `LiquidAI/LFM2.5-2.6B-MLX` inference using `4bit/` with application context in production. | FR-002, FR-004, FR-005; Technical Constraints |
 | ClipboardPaste | `init(activeApplication: @escaping () throws -> String?, hasEditableSelection: @escaping () throws -> Bool, writeClipboard: @escaping (String) throws -> Void, sendPasteCommand: @escaping () throws -> Void) throws` | Application lookup, focus inspection, clipboard writing, and paste command. | FR-003, FR-004, FR-006 |
 | VoiceTypingFlow | `init(recording: any RecordingContract, transcription: any TranscriptionContract, textCorrection: any TextCorrectionContract, clipboardPaste: any ClipboardPasteContract, language: Language, shortcut: String, registerShortcut: @escaping (String, @escaping () throws -> Void) throws -> Void, notifyInferenceFailure: @escaping () -> Void) throws` | Four module contracts, language, fixed Control double-tap shortcut and registration, and macOS inference-failure notification. | FR-001–FR-008, AC-001 |
 

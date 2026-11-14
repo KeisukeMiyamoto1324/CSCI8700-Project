@@ -101,15 +101,24 @@ Speech model selection is resolved by spec Technical Constraints:
 the 4-bit quantized MLX Whisper Large v3 Turbo model. Runtime integration and
 real-model validation are not implemented. Validate local loading, ten-language
 transcription, and silence/non-speech behavior using test_plan's selected-model
-checks. Text-correction LLM selection remains open.
+checks.
+
+## Selected correction model
+
+Text-correction model selection is resolved by spec Technical Constraints:
+[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX).
+Use the repository's `4bit/` variant. Revision, prompt, and Swift inference
+integration remain undecided. Runtime integration and quality
+validation are not implemented. Selection does not change slices 7–8: they still
+defer real LLM correction and slice 8 uses a development-only identity closure.
 
 ## Design questions
 
 - Before slice 7: how should Swift call the selected model, which inference library should load it, and what audio format/transfer mechanism should connect Recording to Transcription? Decide where the existing app UI composes these dependencies and how inference avoids blocking UI updates while preserving existing contracts.
 - Before slice 8: decide Control double-tap timing and event handling, real editable-focus inspection and paste support, notification wiring, and UI behavior during capture/inference. Define setup permissions and a repeatable way to exercise inference and delivery failures without changing the final contracts.
 - Where should real microphone, MLX, global shortcut, focus, clipboard, paste, and notification closures be composed? The app currently only displays a placeholder. Existing contracts expose injection points but no composition function. Any new function/module needs a design decision first.
-- Which text-correction LLM and silence-detection behavior meet the requirements? The speech model is fixed above; its inference library and Swift integration remain undecided. Model files are prepared during setup; runtime integration and validation are still pending.
-- Which applications and formatting/style rules must TextCorrection support? When should application context be sampled? Destination focus is explicitly checked at paste time.
+- Which revision and correction prompt should be used for the selected 4-bit LFM model, and how should Swift invoke it? Both model choices and precisions are fixed above; inference integration, correction-quality validation, and silence-detection behavior remain pending. Model files are prepared during setup.
+- Which applications and formatting/style rules must TextCorrection support? Application context is already sampled immediately before correction; destination focus is checked at paste time.
 - What cleanup is expected after capture or application-lookup failures beyond the contracted throw/discard behavior?
 
 ## Coverage audit

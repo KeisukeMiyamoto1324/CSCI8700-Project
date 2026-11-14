@@ -38,12 +38,31 @@ Run AC-001 and the ten-language and silence/non-speech probes above with actual
 recordings and the selected speech model. Verify that supported-language speech
 is transcribed in its original language and silence/non-speech yields an empty
 transcription with no downstream work. Check meaning rather than exact model
-wording. Full-flow validation also requires a configured local correction LLM.
+wording. Full-flow validation also requires the selected local correction LLM
+described below.
 
 These are planned integration checks, not passing test results. The current
 injected-closure tests do not load the model or establish speech-recognition quality.
 The inference library, Swift integration, and silence-detection details remain
 to be decided; no thresholds or quality scores are specified here.
+
+## Selected correction model validation
+
+Production text correction uses
+[`LiquidAI/LFM2.5-2.6B-MLX`](https://huggingface.co/LiquidAI/LFM2.5-2.6B-MLX)
+locally through MLX using its `4bit/` variant (spec Technical Constraints).
+Verify the selected precision and record the resolved revision and correction
+prompt before real-model validation.
+Prepare model files during setup and verify runtime correction sends no audio
+or text to external servers.
+
+Run AC-001 and the ten-language, meaning/context, and inference-failure probes
+with the actual correction model. Verify spelling/wording correction, preserved
+meaning and language, agreed application style, and notification/discard on
+correction failure. Exact generated wording is not fixed. Model selection alone
+does not establish that all ten required languages or style rules are supported.
+These checks are planned, not executed; current fixed-result tests do not load
+the LLM. Development-stage slices 7–8 below continue to defer LLM integration.
 
 ## Development-stage real-device checks (no LLM)
 
